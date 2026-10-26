@@ -1,0 +1,41 @@
+{
+  "format_version": 3,
+  "format_uuid": "289f771f-2c9a-4d73-9f3f-8492495a924d",
+  "tooth": "github.com/alaydriem/levi-stratum",
+  "version": "0.1.0",
+  "info": {
+    "name": "Alaydriem's Stratum",
+    "description": "Structure ghost blocks, markers and material lists for Minecraft Bedrock (Windows) on LeviLamina",
+    "tags": [
+      "platform:levilamina",
+      "type:mod",
+      "structure",
+      "ghost-blocks"
+    ]
+  },
+  "variants": [
+    {
+      "label": "client",
+      "platform": "win-x64",
+      "dependencies": {
+        "github.com/LiteLDev/LeviLamina#client": ">=26.51.6 <26.52.0",
+        "github.com/alaydriem/levi-modmanager#client": ">=0.1.0 <0.2.0"
+      },
+      "assets": [
+        {
+          "type": "zip",
+          "urls": [
+            "https://{{tooth}}/releases/download/v{{version}}/alaydriem-stratum-{{version}}-client-windows-x64.zip"
+          ],
+          "placements": [
+            {
+              "type": "dir",
+              "src": "alaydriem-stratum/",
+              "dest": "mods/alaydriem-stratum/"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

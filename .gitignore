@@ -1,0 +1,8 @@
+/target
+/mise.local.toml
+/shim/build
+/shim/.xmake
+/shim/bin
+/.superpowers/
+/samples/
+docs/

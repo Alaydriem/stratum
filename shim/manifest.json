@@ -1,0 +1,15 @@
+{
+    "name": "alaydriem-stratum",
+    "author": "Alaydriem",
+    "entry": "${modFile}",
+    "version": "${modVersion}",
+    "type": "native",
+    "platform": "client",
+    "clientSide": true,
+    "dependencies": [
+        {
+            "name": "alaydriem-mod-manager",
+            "version": ">=0.1.0 <0.2.0"
+        }
+    ]
+}
