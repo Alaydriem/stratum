@@ -3,6 +3,7 @@
 #include "bridge/ModLog.h"
 #include "bridge/RustBridge.h"
 #include "picker/PickerPump.h"
+#include "spike/EasyPlaceSpike.h"
 #include "state/FrameStatusReader.h"
 
 #include <ll/api/memory/Hook.h>
@@ -43,6 +44,7 @@ LL_TYPE_INSTANCE_HOOK(
         lastTick = tick;
     }
     if (st_take_picker_request(handle)) PickerPump::request();
+    EasyPlaceSpike::tick(*this);
     return result;
 }
 

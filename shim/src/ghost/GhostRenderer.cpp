@@ -5,6 +5,7 @@
 #include "ghost/BlockChangeHook.h"
 #include "ghost/GhostRenderHook.h"
 #include "state/FrameStatusReader.h"
+#include "spike/SpikeGhost.h"
 
 #include <mc/client/game/IClientInstance.h>
 #include <mc/client/gui/screens/ScreenContext.h>
@@ -95,6 +96,7 @@ void GhostRenderer::frameIn(LevelRenderer& renderer, ScreenContext& screen, Fram
         join(renderer, screen, *region, !epochMoved);
     }
     apply(ghost, screen);
+    SpikeGhost::setDraws(ghost);
     float camera[3] = {0.0f, 0.0f, 0.0f};
     if (!frame.mViews->empty()) {
         glm::vec3 const& pos = *frame.mViews->front().mViewData->mCameraPos;
@@ -141,6 +143,7 @@ void GhostRenderer::join(LevelRenderer& renderer, ScreenContext& screen, BlockSo
 
 // a Block pointer and the tessellator's region belong to the world that was left, so both go with the meshes
 void GhostRenderer::leave() {
+    SpikeGhost::clear();
     for (auto& slot : mSlots) slot.reset();
     mGroup.clear();
     mTessellator.leave();
@@ -169,11 +172,13 @@ void GhostRenderer::apply(StGhostFrame const& frame, ScreenContext& screen) {
     mGeneration = frame.generation;
     if (frame.clear_all) {
         for (auto& slot : mSlots) slot.reset();
+        SpikeGhost::clear();
     }
     for (uint32_t i = 0; i < frame.free_count; ++i) {
         if (frame.frees[i] >= mSlots.size()) continue;
         mSlots[frame.frees[i]].reset();
         mGroup.free(frame.frees[i]);
+        SpikeGhost::freeSlot(frame.frees[i]);
     }
     mPaletteResolved = frame.has_palette;
     if (frame.has_palette) resolvePalette(frame);
@@ -215,6 +220,7 @@ bool GhostRenderer::buildReplace(StGhostJob const& job, ScreenContext& screen, u
     GhostTessellator::Built built{};
     if (mUsable) built = mTessellator.build(screen.tessellator, job, mBlocks, alpha, mSlots[job.slot]);
     if (built.busy) return false;
+    SpikeGhost::record(job, mBlocks);
     // the slot's mesh is no longer a group's
     mGroup.free(job.slot);
     mSizes[job.slot] = {job.slot_size[0], job.slot_size[1], job.slot_size[2]};

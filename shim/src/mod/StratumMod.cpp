@@ -6,6 +6,8 @@
 #include "hooks/ClientUpdateHook.h"
 #include "hooks/GameFocusLostHook.h"
 #include "picker/PickerPump.h"
+#include "spike/EasyPlaceSpike.h"
+#include "spike/SpikeHooks.h"
 #include "state/WorldKeyReader.h"
 
 #include "ll/api/mod/RegisterHelper.h"
@@ -47,6 +49,10 @@ bool StratumMod::enable() {
     ClientUpdateHook::hook();
     GameFocusLostHook::hook();
     GhostRenderer::start();
+    EasyPlaceSpike::setConfigDir(mConfigDir);
+    SpikeBuildActionHook::hook();
+    SpikeBuildBlockHook::hook();
+    SpikeHudTickHook::hook();
     ModLog::info(
         "stratum enabled",
         "{\"config_dir\":" + ModLog::quote(RustBridge::utf8(mConfigDir))
@@ -58,6 +64,9 @@ bool StratumMod::enable() {
 bool StratumMod::disable() {
     if (!RustBridge::handle()) return true;
     // unhook first so no game call can enter Rust, then end the picker, then unregister and stop Rust
+    SpikeHudTickHook::unhook();
+    SpikeBuildBlockHook::unhook();
+    SpikeBuildActionHook::unhook();
     GhostRenderer::stop();
     GameFocusLostHook::unhook();
     ClientUpdateHook::unhook();
