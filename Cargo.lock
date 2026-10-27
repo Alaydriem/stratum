@@ -49,7 +49,8 @@ dependencies = [
 
 [[package]]
 name = "amm-abi"
-version = "0.1.0"
+version = "1.0.0"
+source = "git+https://github.com/Alaydriem/levi-modmanager?tag=v1.0.0#cd5144a72db6ba5ffa3a0b5d6ed1d71884a93c8f"
 dependencies = [
  "amm-core",
  "bytemuck",
@@ -57,7 +58,8 @@ dependencies = [
 
 [[package]]
 name = "amm-client"
-version = "0.1.0"
+version = "1.0.0"
+source = "git+https://github.com/Alaydriem/levi-modmanager?tag=v1.0.0#cd5144a72db6ba5ffa3a0b5d6ed1d71884a93c8f"
 dependencies = [
  "amm-abi",
  "amm-core",
@@ -75,7 +77,8 @@ dependencies = [
 
 [[package]]
 name = "amm-core"
-version = "0.1.0"
+version = "1.0.0"
+source = "git+https://github.com/Alaydriem/levi-modmanager?tag=v1.0.0#cd5144a72db6ba5ffa3a0b5d6ed1d71884a93c8f"
 dependencies = [
  "arc-swap",
  "bytemuck",
@@ -1472,7 +1475,9 @@ dependencies = [
  "crossbeam-channel",
  "curia",
  "hcl-rs",
+ "png",
  "serde",
+ "serde_json",
  "tempfile",
  "thiserror",
 ]
@@ -1500,6 +1505,7 @@ dependencies = [
 name = "stratum-tools"
 version = "0.1.0"
 dependencies = [
+ "png",
  "stratum-core",
 ]
 

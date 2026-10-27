@@ -22,7 +22,7 @@ Stratum is everything Structura and Holoprint should be if they weren't restrict
 - Import a .mcstructure while in the game from the Windows native file picker. No more converting structures to Structura or Holoprint.
 - Persistent markers that are locked to their position and settings in each world. Create markers for all of your projects, load them when you need them, and pick up _exactly_ where you left them. No more re-adjusting Holoprint or Structura packs to get them locked to the right position.
 - Rotate, move, and adjust the opacity and layer for each structure independently, with ghost blocks for the active marker
-- Easy Place - grab your items in your inventory then right click to auto-place and correctly orient blocks from your inventory
+- Easy Place - grab your items in your inventory then right click to auto-place the correct block from your inventory. Slabs and stairs take their top or bottom half from the structure; the facing follows the player
 - Material lists with text export, item counts, and stacks with sorting and filtering
 - In game rendering previews of every structure
 

@@ -2,7 +2,7 @@ use crate::config::EasyPlaceConfig;
 use crate::services::{GhostRay, PlaceNeeds};
 use crate::structs::easy_place::{
     Aim, AimKind, EasyPlaceNotice, EasyPlaceTelemetry, Face, FaceRule, GameMode, Half, HoldState, InventorySlot,
-    PendingPlace, PendingSet, PlaceNeed, Placement, SpotWorld, SwapAnswer, TriedSet, UseCommand, UseProbe,
+    PendingPlace, PendingSet, PlaceNeed, Placement, RayLimits, SpotWorld, SwapAnswer, TriedSet, UseCommand, UseProbe,
 };
 use crate::structs::ghost::{GhostBuild, GhostView};
 
@@ -32,6 +32,9 @@ impl EasyPlaceService {
     const HOTBAR_SLOTS: usize = 9;
     const INVENTORY_SLOTS: usize = 36;
     const AIR: &'static str = "minecraft:air";
+    // Added to the hit distance so that a rounding tie with the shim's walk never ends the ghost walk
+    // before the hit cell. The hit cell itself is excluded by cell, not by distance.
+    const HIT_SLACK: f64 = 1e-6;
 
     pub fn new(config: EasyPlaceConfig) -> Self {
         let pending = PendingSet::new(config.pending_capacity());
@@ -76,12 +79,17 @@ impl EasyPlaceService {
             self.aim.kind = AimKind::Waiting;
             return None;
         }
-        let max_distance = match probe.hit {
-            Some(hit) if !hit.replaceable => probe.reach.min(hit.distance),
-            _ => probe.reach,
+        let limits = match probe.hit {
+            Some(hit) if !hit.replaceable => RayLimits::new(
+                probe.reach.min(hit.distance + Self::HIT_SLACK),
+                Some(hit.cell),
+                self.halved.contains(hit.cell),
+                probe.body,
+            ),
+            _ => RayLimits::new(probe.reach, None, false, probe.body),
         };
         self.aim.kind = AimKind::Clear;
-        let (spot, palette_id) = GhostRay::first_spot(build, view, needs, probe.eye, probe.dir, max_distance)?;
+        let (spot, palette_id) = GhostRay::first_spot(build, view, needs, probe.eye, probe.dir, &limits)?;
         let PlaceNeed::Place { item, rule, slab_of, half } = needs.need(palette_id) else {
             return None;
         };
@@ -140,6 +148,15 @@ impl EasyPlaceService {
         self.pending.record_seen(cell, block);
     }
 
+    // The shim did not carry out the placement at `spot`: no HUD to select with, a select the game did not
+    // take, or a build the game refused. The pending entry goes and counts as not sent instead of placed.
+    pub fn not_sent(&mut self, spot: [i32; 3]) {
+        if self.pending.remove(spot) {
+            self.telemetry.placed = self.telemetry.placed.saturating_sub(1);
+            self.telemetry.not_sent += 1;
+        }
+    }
+
     // The use key went up, or a gate closed. The pending set stays.
     pub fn end_hold(&mut self) {
         self.hold.clear();
@@ -168,7 +185,7 @@ impl EasyPlaceService {
     }
 
     // Counts every pending entry whose deadline has passed.
-    fn expire(&mut self, time_seconds: f64) {
+    pub fn expire(&mut self, time_seconds: f64) {
         while self.pending.pop_due(time_seconds, &mut self.scratch) {
             let seen = self.scratch.seen.as_str();
             if seen.is_empty() || seen == Self::AIR {

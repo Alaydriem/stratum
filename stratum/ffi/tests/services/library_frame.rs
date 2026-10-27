@@ -208,6 +208,7 @@ impl PickedLibrary {
             project: Some(ProjectId(7)),
             grid_cell: None,
             has_origin: false,
+            file_name: String::new(),
         };
         let mut pick = ImportPick::new(1, Some(ProjectId(7)));
         pick.structures = vec![StructureId(10)];

@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use stratum_core::services::{GhostAssembler, GhostRay, ItemRules, PlaceNeeds};
+use stratum_core::structs::easy_place::RayLimits;
 use stratum_core::structs::ghost::{GhostBuild, GhostView, PlacedStructure};
 use stratum_core::structs::marker::Rotation;
 use stratum_core::structs::structure::{BlockLayer, BlockState, BlockStates, SparseLayer, Structure, StructureSize};
@@ -45,10 +46,24 @@ fn bench_ray(c: &mut Criterion) {
     for reach in [5.0_f64, 64.0] {
         group.bench_function(format!("first_spot_reach_{reach}"), |b| {
             b.iter(|| {
-                GhostRay::first_spot(black_box(&build), GhostView::Whole, &needs, black_box(eye), black_box(dir), reach)
+                GhostRay::first_spot(
+                    black_box(&build),
+                    GhostView::Whole,
+                    &needs,
+                    black_box(eye),
+                    black_box(dir),
+                    &RayLimits::reach(reach),
+                )
             })
         });
     }
+    // A stop cell and a body box that the ray never reaches, so the walk tests both on every cell.
+    let limits = RayLimits::new(64.0, Some([0, 0, 0]), false, Some(([0, 0, 0], [0, 1, 0])));
+    group.bench_function("first_spot_reach_64_with_stop_and_body", |b| {
+        b.iter(|| {
+            GhostRay::first_spot(black_box(&build), GhostView::Whole, &needs, black_box(eye), black_box(dir), &limits)
+        })
+    });
     group.finish();
 }
 

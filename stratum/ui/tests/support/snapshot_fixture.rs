@@ -18,6 +18,7 @@ impl SnapshotFixture {
             project: project.map(ProjectId),
             grid_cell: None,
             has_origin: false,
+            file_name: String::new(),
         }
     }
 

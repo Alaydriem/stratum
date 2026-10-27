@@ -2065,6 +2065,7 @@ impl UseScene {
             reach: 20.0,
             game_mode: GameMode::Survival,
             hit: None,
+            body: None,
             swap_answer: SwapAnswer::None,
         }
     }
@@ -2261,4 +2262,18 @@ fn a_missing_block_notice_carries_the_needed_item_until_it_expires() {
     controller.tick(&Frames::in_world(GhostScene::WORLD, 2.0 + EasyPlaceService::NOTICE_SECONDS));
     let hud = controller.snapshot().hud.clone().unwrap();
     assert_eq!((hud.notice, hud.notice_item), (None, None));
+}
+
+#[test]
+fn a_pending_placement_expires_on_the_tick_without_a_use_call() {
+    let data = tempfile::tempdir().unwrap();
+    let mut controller = UseScene::start(data.path());
+    UseScene::enable(&mut controller);
+    let probe = UseScene::above(0, 0);
+    UseScene::aim_when_ready(&mut controller, &probe);
+    assert!(matches!(UseScene::place(&mut controller, &probe), UseCommand::Place(_)));
+
+    controller.tick(&Frames::in_world(GhostScene::WORLD, 4.0));
+
+    assert_eq!(controller.easy_place_telemetry().rejected, 1);
 }

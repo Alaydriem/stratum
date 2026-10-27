@@ -111,6 +111,29 @@ pub extern "C" fn st_use_released(handle: *mut StHandle) -> StStatus {
     })
 }
 
+/// The Place or Select and Place command st_use_decide gave for `spot` was not carried out: no HUD to select
+/// with, a select the game did not take, or a build the game refused. Call it on the game thread right after the
+/// failed command. The placement is counted as not sent, not as placed. `spot` is read during the call only.
+/// Returns InvalidArgument for a null handle or spot, and Failed after an earlier panic.
+#[unsafe(no_mangle)]
+pub extern "C" fn st_use_not_sent(handle: *mut StHandle, spot: *const [i32; 3]) -> StStatus {
+    StBoundary::guard(|| {
+        let (Some(handle), Some(spot)) = (
+            // SAFETY: the handle came from st_create or is null; the use executor passes RustBridge::handle()
+            unsafe { StBoundary::handle(handle) },
+            // SAFETY: spot is null or readable for the call; the use executor passes the command's spot array
+            unsafe { StBoundary::input(spot) },
+        ) else {
+            return StStatus::InvalidArgument;
+        };
+        let spot = *spot;
+        match handle.with_state(|state| state.use_not_sent(spot)) {
+            Some(()) => StStatus::Ok,
+            None => StStatus::Failed,
+        }
+    })
+}
+
 /// The block at (x, y, z) is `name` now, as the game reports it; the placements that wait for the server are
 /// checked against it. Call it on the game thread for each block change. `name` is read during the call only.
 /// `time_seconds` is the frame clock. Returns InvalidArgument for a null handle or a name view that is null with

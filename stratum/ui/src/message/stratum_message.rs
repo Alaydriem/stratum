@@ -218,6 +218,10 @@ pub enum StratumMessage {
     HudEasyPlaceOff,
     EasyPlaceMissing,
     EasyPlaceNoNeighbour,
+    // the 3D preview pane
+    PreviewDrawing,
+    PreviewFailed,
+    PreviewRenderTime,
 }
 
 impl Message for StratumMessage {
@@ -427,6 +431,9 @@ impl Message for StratumMessage {
         Self::HudEasyPlaceOff,
         Self::EasyPlaceMissing,
         Self::EasyPlaceNoNeighbour,
+        Self::PreviewDrawing,
+        Self::PreviewFailed,
+        Self::PreviewRenderTime,
     ];
 
     fn index(self) -> usize {
@@ -655,6 +662,9 @@ impl Message for StratumMessage {
             Self::HudEasyPlaceOff => "Off",
             Self::EasyPlaceMissing => "No {block} in your inventory",
             Self::EasyPlaceNoNeighbour => "Nothing to place this block against",
+            Self::PreviewDrawing => "Drawing the preview",
+            Self::PreviewFailed => "No preview for this structure",
+            Self::PreviewRenderTime => "{ms} ms",
         }
     }
 
@@ -696,6 +706,7 @@ impl Message for StratumMessage {
             Self::HudLetterX | Self::HudLetterY | Self::HudLetterZ => Some("a world axis"),
             Self::HudEasyPlaceOn | Self::HudEasyPlaceOff => Some("the state of the easy place switch"),
             Self::EasyPlaceMissing => Some("{block} is the readable name of the item the build needs"),
+            Self::PreviewRenderTime => Some("the time the last preview picture took to draw, in milliseconds"),
             _ => None,
         }
     }

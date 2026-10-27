@@ -724,3 +724,14 @@ msgstr ""
 
 msgid "Nothing to place this block against"
 msgstr ""
+
+msgid "Drawing the preview"
+msgstr ""
+
+msgid "No preview for this structure"
+msgstr ""
+
+#. the time the last preview picture took to draw, in milliseconds
+#, python-brace-format
+msgid "{ms} ms"
+msgstr ""

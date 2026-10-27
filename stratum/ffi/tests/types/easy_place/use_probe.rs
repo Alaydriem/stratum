@@ -15,6 +15,9 @@ fn probe() -> StUseProbe {
         hit_face: 5,
         hit_distance: 3.5,
         hit_replaceable: true,
+        has_body: true,
+        body_min: [1, 1, 3],
+        body_max: [1, 2, 3],
         swap_answer: 2,
     }
 }
@@ -38,4 +41,15 @@ fn a_code_out_of_range_reads_as_the_safe_choice() {
     assert_eq!(read.swap_answer, SwapAnswer::None);
     assert!(read.hit.is_none(), "a face past the last one is no hit");
     assert!(no_hit.hit.is_none());
+}
+
+#[test]
+fn the_body_box_reads_only_when_set_and_ordered() {
+    let read = UseProbe::from(&probe());
+    let unset = UseProbe::from(&StUseProbe { has_body: false, ..probe() });
+    let inverted = UseProbe::from(&StUseProbe { body_min: [1, 3, 3], ..probe() });
+
+    assert_eq!(read.body, Some(([1, 1, 3], [1, 2, 3])));
+    assert!(unset.body.is_none());
+    assert!(inverted.body.is_none(), "a min above the max on one axis is no body");
 }

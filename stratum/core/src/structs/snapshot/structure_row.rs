@@ -12,6 +12,8 @@ pub struct StructureRow {
     pub project: Option<ProjectId>,
     pub grid_cell: Option<GridCell>,
     pub has_origin: bool,
+    // The stored file inside the structures folder.
+    pub file_name: String,
 }
 
 impl StructureRow {
@@ -24,6 +26,7 @@ impl StructureRow {
             project: entry.project,
             grid_cell: entry.grid_cell,
             has_origin: entry.world_origin.is_some(),
+            file_name: entry.file_name.clone(),
         }
     }
 }

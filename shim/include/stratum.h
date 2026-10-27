@@ -35,6 +35,9 @@ typedef struct StUseProbe {
   uint8_t hit_face;
   double hit_distance;
   bool hit_replaceable;
+  bool has_body;
+  int32_t body_min[3];
+  int32_t body_max[3];
   uint8_t swap_answer;
 } StUseProbe;
 
@@ -199,6 +202,15 @@ enum StStatus st_use_decide(struct StHandle *handle,
  * InvalidArgument for a null handle, and Failed after an earlier panic.
  */
 enum StStatus st_use_released(struct StHandle *handle);
+
+/**
+ * The Place or Select and Place command st_use_decide gave for `spot` was not carried out: no HUD to select
+ * with, a select the game did not take, or a build the game refused. Call it on the game thread right after the
+ * failed command. The placement is counted as not sent, not as placed. `spot` is read during the call only.
+ * Returns InvalidArgument for a null handle or spot, and Failed after an earlier panic.
+ */
+enum StStatus st_use_not_sent(struct StHandle *handle,
+                              const int32_t (*spot)[3]);
 
 /**
  * The block at (x, y, z) is `name` now, as the game reports it; the placements that wait for the server are

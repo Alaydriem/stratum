@@ -17,3 +17,4 @@ workspace = true
 
 [dependencies]
 stratum-core.workspace = true
+png.workspace = true

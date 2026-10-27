@@ -19,6 +19,7 @@ mod material_counter;
 mod materials_worker;
 mod nbt_reader;
 mod place_needs;
+mod preview;
 mod section_scan;
 mod store_writer;
 mod stratum_controller;

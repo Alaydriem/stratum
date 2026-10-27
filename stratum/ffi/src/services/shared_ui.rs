@@ -3,6 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use super::FrameMeter;
 use crossbeam_channel::{Receiver, Sender};
+use stratum_core::services::preview::PreviewService;
 use stratum_core::structs::action::LibraryAction;
 use stratum_core::structs::hud::HudState;
 use stratum_core::structs::snapshot::LibrarySnapshot;
@@ -23,6 +24,8 @@ pub struct SharedUi {
     // Counts the opens, so the frame starts each one with fresh UI state.
     opens: AtomicU64,
     meter: FrameMeter,
+    // The 3D structure preview the library card shows; None shows the size box instead.
+    preview: Option<Arc<PreviewService>>,
 }
 
 impl SharedUi {
@@ -39,11 +42,24 @@ impl SharedUi {
             close_requested: AtomicBool::new(false),
             opens: AtomicU64::new(0),
             meter: FrameMeter::new(),
+            preview: None,
         }
     }
 
     pub fn new_shared() -> Arc<Self> {
         Arc::new(Self::new())
+    }
+
+    pub fn with_preview(preview: Arc<PreviewService>) -> Self {
+        Self { preview: Some(preview), ..Self::new() }
+    }
+
+    pub fn new_shared_with_preview(preview: Arc<PreviewService>) -> Arc<Self> {
+        Arc::new(Self::with_preview(preview))
+    }
+
+    pub fn preview(&self) -> Option<&Arc<PreviewService>> {
+        self.preview.as_ref()
     }
 
     // The telemetry the frame fills and the tick reads.

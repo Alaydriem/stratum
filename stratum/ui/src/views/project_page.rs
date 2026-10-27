@@ -19,6 +19,7 @@ use stratum_core::structs::snapshot::{LibrarySnapshot, ProjectRow, StructureRow}
 
 use super::{
     CardFooter, FactsPanel, GridEditor, ImportButton, MarkerActions, MaterialsTab, PageTitle, ProjectMenu, StratumId,
+    StructurePreview,
 };
 use crate::message::StratumMessage;
 use crate::presenter::{DigitGroups, MaterialsSubject, PieceOffset};
@@ -48,6 +49,7 @@ impl ProjectPage {
         project: &ProjectRow,
         state: &mut LibraryUiState,
         out: &mut Vec<LibraryAction>,
+        preview: Option<&mut StructurePreview>,
     ) {
         let blocks = project.structures.iter().fold(0u64, |sum, row| sum.saturating_add(row.block_count));
         let used = Self::marker_count(snapshot, project);
@@ -95,7 +97,7 @@ impl ProjectPage {
 
         ui.add_space(PageTitle::SECTION_GAP);
         match state.project_tab {
-            ProjectTab::Structures => Self::show_structures(ui, snapshot, project, state, out),
+            ProjectTab::Structures => Self::show_structures(ui, snapshot, project, state, out, preview),
             ProjectTab::Materials => {
                 if let Some(subject) = MaterialsSubject::of(snapshot, MaterialScope::Project(project.id)) {
                     self.materials.show(ui, snapshot, state, &subject, out);
@@ -123,6 +125,7 @@ impl ProjectPage {
         project: &ProjectRow,
         state: &mut LibraryUiState,
         out: &mut Vec<LibraryAction>,
+        preview: Option<&mut StructurePreview>,
     ) {
         let layout = Self::layout_of(snapshot, project);
         Self::show_layout_banner(ui, layout);
@@ -134,7 +137,7 @@ impl ProjectPage {
         let selected = Self::selected(project, state);
         Self::show_list(&mut list_ui, snapshot, project, layout, selected, state);
         let mut card_ui = ui.new_child(UiBuilder::new().max_rect(card).layout(Layout::top_down(Align::Min)));
-        Self::show_card(&mut card_ui, snapshot, project, layout, state, out);
+        Self::show_card(&mut card_ui, snapshot, project, layout, state, out, preview);
     }
 
     // The layout of a big build project; a normal project has none.
@@ -239,6 +242,7 @@ impl ProjectPage {
         layout: Option<&Result<BigBuildLayout, LayoutIssue>>,
         state: &mut LibraryUiState,
         out: &mut Vec<LibraryAction>,
+        preview: Option<&mut StructurePreview>,
     ) {
         if project.kind == ProjectKind::Normal
             && let Some(row) = state.resolve_selection(&project.structures)
@@ -246,7 +250,7 @@ impl ProjectPage {
             let height = ui.max_rect().height();
             let area = ScrollArea::vertical().id_salt(StratumId::ProjectCardScroll).auto_shrink([false, false]);
             ScrollBar::show(ui, area, false, |ui| {
-                FactsPanel::show(ui, snapshot, row, Some(&project.name), state, height);
+                FactsPanel::show(ui, snapshot, row, Some(&project.name), state, height, preview);
             });
             return;
         }

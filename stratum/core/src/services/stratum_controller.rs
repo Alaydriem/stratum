@@ -242,6 +242,7 @@ impl StratumController {
         if self.status.menu_open {
             self.easy_place.end_hold();
         }
+        self.easy_place.expire(self.status.time_seconds);
         self.sync_world();
         self.check_movement(moved);
         self.poll_inbox();
@@ -396,6 +397,11 @@ impl StratumController {
     // A block of the world changed at `cell`; `block` is its name.
     pub fn block_seen(&mut self, cell: [i32; 3], block: &[u8], time_seconds: f64) {
         self.easy_place.seen(cell, block, time_seconds);
+    }
+
+    // The shim did not carry out the placement at `spot`.
+    pub fn use_not_sent(&mut self, spot: [i32; 3]) {
+        self.easy_place.not_sent(spot);
     }
 
     // The use key went up, or a gate closed.

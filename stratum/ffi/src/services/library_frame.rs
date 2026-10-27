@@ -29,8 +29,8 @@ pub struct LibraryFrame {
 impl LibraryFrame {
     pub fn new(shared: Arc<SharedUi>) -> Self {
         Self {
+            view: Self::new_view(&shared),
             shared,
-            view: LibraryView::new(),
             state: LibraryUiState::new(),
             snapshot: Arc::new(LibrarySnapshot::empty()),
             actions: Vec::with_capacity(SharedUi::ACTION_CAPACITY),
@@ -43,6 +43,13 @@ impl LibraryFrame {
         &self.state
     }
 
+    fn new_view(shared: &SharedUi) -> LibraryView {
+        match shared.preview() {
+            Some(preview) => LibraryView::with_preview(Arc::clone(preview)),
+            None => LibraryView::new(),
+        }
+    }
+
     fn nothing() -> FrameReply {
         FrameReply { cursor: CursorShape::Default, layer_rect: Rect::NOTHING }
     }
@@ -51,7 +58,7 @@ impl LibraryFrame {
         let opens = self.shared.opens();
         if opens != self.opens {
             self.opens = opens;
-            self.view = LibraryView::new();
+            self.view = Self::new_view(&self.shared);
             // a pick the player already saw does not move the page or flash again
             let pick_flash = std::mem::take(&mut self.state.pick_flash).after_close();
             self.state = LibraryUiState::new();

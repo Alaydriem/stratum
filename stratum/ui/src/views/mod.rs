@@ -18,6 +18,7 @@ pub mod sidebar_view;
 pub mod size_box;
 pub mod structure_list_page;
 pub mod structure_page;
+pub mod structure_preview;
 
 pub use card_footer::CardFooter;
 pub use detail_view::DetailView;
@@ -38,3 +39,4 @@ pub use sidebar_view::SidebarView;
 pub use size_box::SizeBox;
 pub use structure_list_page::StructureListPage;
 pub use structure_page::StructurePage;
+pub use structure_preview::StructurePreview;

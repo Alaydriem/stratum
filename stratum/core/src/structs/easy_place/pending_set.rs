@@ -47,17 +47,34 @@ impl PendingSet {
         evicted
     }
 
-    // Records the block name seen at a pending spot.
+    // Records the block name seen at a pending spot. Once the expected block was seen the entry is
+    // settled and a later change does not undo it. The first half of a double slab settles on the
+    // single slab and can then only move on to the double slab.
     pub fn record_seen(&mut self, spot: [i32; 3], block: &[u8]) {
         let Ok(name) = std::str::from_utf8(block) else {
             return;
         };
         for entry in &mut self.entries[..self.len] {
-            if entry.spot == spot {
+            if entry.spot != spot {
+                continue;
+            }
+            let expected_seen = !entry.seen.is_empty() && entry.seen == entry.expected;
+            let half_seen = entry.first_half && !entry.slab.is_empty() && entry.seen == entry.slab;
+            if !expected_seen && (!half_seen || name == entry.expected) {
                 entry.seen.clear();
                 entry.seen.push_str(name);
             }
         }
+    }
+
+    // Removes the entry at `spot`. Returns true when there was one.
+    pub fn remove(&mut self, spot: [i32; 3]) -> bool {
+        let Some(index) = self.entries[..self.len].iter().position(|entry| entry.spot == spot) else {
+            return false;
+        };
+        self.entries[index..self.len].rotate_left(1);
+        self.len -= 1;
+        true
     }
 
     // Moves the oldest entry whose deadline has passed into `out` and removes it.

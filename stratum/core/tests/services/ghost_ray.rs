@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use stratum_core::services::{GhostAssembler, GhostRay, ItemRules, PlaceNeeds};
+use stratum_core::structs::easy_place::RayLimits;
 use stratum_core::structs::ghost::{GhostBuild, GhostView, PlacedStructure};
 use stratum_core::structs::marker::Rotation;
 
@@ -21,7 +22,7 @@ impl Rays {
         max_distance: f64,
     ) -> Option<([i32; 3], u16)> {
         let needs = PlaceNeeds::new(&build.palette, &ItemRules::new());
-        GhostRay::first_spot(build, view, &needs, eye, dir, max_distance)
+        GhostRay::first_spot(build, view, &needs, eye, dir, &RayLimits::reach(max_distance))
     }
 
     // A build of one 1 x 1 x 2 structure at the origin: water at z 0 and stone at z 1.
@@ -110,4 +111,67 @@ fn a_zero_direction_gives_none() {
     assert_eq!(Rays::cast(&build, GhostView::Whole, eye, [0.0, 0.0, 0.0], 5.0), None);
     assert_eq!(Rays::cast(&build, GhostView::Whole, eye, [f64::NAN, 0.0, 1.0], 5.0), None);
     assert_eq!(Rays::cast(&build, GhostView::Whole, eye, [f64::INFINITY, 0.0, 0.0], 5.0), None);
+}
+
+impl Rays {
+    fn cast_limited(build: &GhostBuild, eye: [f64; 3], dir: [f64; 3], limits: &RayLimits) -> Option<([i32; 3], u16)> {
+        let needs = PlaceNeeds::new(&build.palette, &ItemRules::new());
+        GhostRay::first_spot(build, GhostView::Whole, &needs, eye, dir, limits)
+    }
+}
+
+#[test]
+fn the_stop_cell_is_not_entered_whatever_the_distance() {
+    let build = Rays::stone([0, 0, 0], 3);
+    let eye = [1.5, 10.5, 1.5];
+    let down = [0.0, -1.0, 0.0];
+    let stop = Some([1, 2, 1]);
+    for limit in [20.0, 7.5, f64::from_bits(7.5_f64.to_bits() + 1), f64::from_bits(7.5_f64.to_bits() - 1)] {
+        let limits = RayLimits::new(limit, stop, false, None);
+        assert_eq!(Rays::cast_limited(&build, eye, down, &limits), None, "limit {limit}");
+    }
+}
+
+#[test]
+fn a_spot_in_front_of_the_stop_cell_is_found() {
+    let build = Rays::stone([0, 0, 0], 3);
+    let limits = RayLimits::new(20.0, Some([1, 1, 1]), false, None);
+    let hit = Rays::cast_limited(&build, [1.5, 10.5, 1.5], [0.0, -1.0, 0.0], &limits);
+    assert_eq!(hit, Some(([1, 2, 1], 0)));
+}
+
+#[test]
+fn an_entered_stop_cell_can_be_the_target_and_ends_the_walk() {
+    let build = Rays::stone([0, 0, 0], 3);
+    let limits = RayLimits::new(20.0, Some([1, 2, 1]), true, None);
+    let hit = Rays::cast_limited(&build, [1.5, 10.5, 1.5], [0.0, -1.0, 0.0], &limits);
+    assert_eq!(hit, Some(([1, 2, 1], 0)));
+
+    let water = Rays::water_then_stone();
+    let limits = RayLimits::new(20.0, Some([0, 0, 0]), true, None);
+    assert_eq!(Rays::cast_limited(&water, [0.5, 0.5, -3.5], [0.0, 0.0, 1.0], &limits), None);
+}
+
+#[test]
+fn a_stop_cell_outside_the_build_changes_nothing() {
+    let build = Rays::stone([0, 0, 0], 3);
+    let limits = RayLimits::new(20.0, Some([1, -5, 1]), false, None);
+    let hit = Rays::cast_limited(&build, [1.5, 10.5, 1.5], [0.0, -1.0, 0.0], &limits);
+    assert_eq!(hit, Some(([1, 2, 1], 0)));
+}
+
+#[test]
+fn an_eye_in_an_empty_target_finds_the_target_ahead() {
+    let build = GhostFixture::blocks(&[([0, 0, 0], [0, 0, 0]), ([2, 0, 0], [2, 0, 0])]);
+    let limits = RayLimits::new(5.0, None, false, Some(([0, -1, 0], [0, 0, 0])));
+    let hit = Rays::cast_limited(&build, [0.5, 0.6, 0.5], [1.0, 0.0, 0.0], &limits);
+    assert_eq!(hit, Some(([2, 0, 0], 0)));
+}
+
+#[test]
+fn looking_down_from_inside_the_build_finds_the_cell_under_the_feet() {
+    let build = Rays::stone([0, 0, 0], 3);
+    let limits = RayLimits::new(5.0, None, false, Some(([1, 1, 1], [1, 2, 1])));
+    let hit = Rays::cast_limited(&build, [1.5, 2.6, 1.5], [0.0, -1.0, 0.0], &limits);
+    assert_eq!(hit, Some(([1, 0, 1], 0)));
 }

@@ -4,7 +4,7 @@ use levi_ui::widget::{ButtonKind, ScrollBar, TabRow, TextButton};
 use stratum_core::structs::action::{LibraryAction, MaterialScope};
 use stratum_core::structs::snapshot::{LibrarySnapshot, StructureRow};
 
-use super::{FactsPanel, MaterialsTab, PageTitle, StratumId};
+use super::{FactsPanel, MaterialsTab, PageTitle, StratumId, StructurePreview};
 use crate::message::StratumMessage;
 use crate::presenter::{DigitGroups, MaterialsSubject};
 use crate::state::{LibraryUiState, Page, StructureTab};
@@ -26,6 +26,7 @@ impl StructurePage {
         row: &StructureRow,
         state: &mut LibraryUiState,
         out: &mut Vec<LibraryAction>,
+        preview: Option<&mut StructurePreview>,
     ) {
         // the id and name of the structure's project; an unsorted structure has none
         let project = row
@@ -70,7 +71,7 @@ impl StructurePage {
                 let height = ui.available_height();
                 let area = ScrollArea::vertical().id_salt(StratumId::StructureCardScroll).auto_shrink([false, false]);
                 ScrollBar::show(ui, area, false, |ui| {
-                    FactsPanel::show(ui, snapshot, row, project.map(|(_, name)| name), state, height);
+                    FactsPanel::show(ui, snapshot, row, project.map(|(_, name)| name), state, height, preview);
                 });
             }
             StructureTab::Materials => {

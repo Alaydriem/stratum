@@ -23,6 +23,7 @@ pub mod materials_worker;
 pub mod nbt_reader;
 pub mod nbt_writer;
 pub mod place_needs;
+pub mod preview;
 pub mod section_scan;
 mod store_state;
 pub mod store_writer;

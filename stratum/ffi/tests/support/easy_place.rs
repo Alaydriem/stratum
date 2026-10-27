@@ -41,6 +41,9 @@ impl EasyPlace {
             hit_face: 0,
             hit_distance: 0.0,
             hit_replaceable: false,
+            has_body: false,
+            body_min: [0; 3],
+            body_max: [0; 3],
             swap_answer: 0,
         }
     }

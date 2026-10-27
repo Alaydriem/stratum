@@ -11,8 +11,9 @@ namespace stratum {
 
 // carries out the command st_use_decide gave: selects a hotbar slot through the HUD, places a block through the
 // game mode, or hands a swap or a pick to StackRequest. It decides nothing; a command it cannot carry out (no HUD
-// to select with, a select the game did not take) places nothing. The HUD controller is held from its tick until
-// it is destroyed or the world is left
+// to select with, a select the game did not take, a build the game refused) places nothing, and a Place or Select
+// and Place that placed nothing is reported to core with st_use_not_sent. The HUD controller is held from its tick
+// until it is destroyed or the world is left
 class UseExecutor {
 public:
     static void run(IClientInstance& client, LocalPlayer& player, StUseCommand const& command);
@@ -48,7 +49,8 @@ private:
     static inline bool                 sNoHudLogged = false;
 
     static bool select(LocalPlayer& player, uint8_t slot);
-    static void place(LocalPlayer& player, StUseCommand const& command);
+    static bool place(LocalPlayer& player, StUseCommand const& command);
+    static void notSent(StUseCommand const& command);
 };
 
 } // namespace stratum

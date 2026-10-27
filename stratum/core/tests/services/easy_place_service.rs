@@ -80,6 +80,7 @@ impl Probes {
             reach: 8.0,
             game_mode: GameMode::Survival,
             hit: None,
+            body: None,
             swap_answer: SwapAnswer::None,
         }
     }
@@ -573,4 +574,110 @@ fn a_block_without_a_half_clicks_the_face_centre() {
         Face::East => expected[0] = 1.0,
     }
     assert_eq!(placement.click, expected);
+}
+
+struct Ulps;
+
+impl Ulps {
+    // The value, one step below it and one step above it.
+    fn around(value: f64) -> [f64; 3] {
+        [value, f64::from_bits(value.to_bits() - 1), f64::from_bits(value.to_bits() + 1)]
+    }
+}
+
+#[test]
+fn a_filled_spot_is_vanilla_at_any_tie_of_the_hit_distance() {
+    // From y 5.5 straight down the ray enters the spot through its top face at distance 4.5.
+    for distance in Ulps::around(4.5) {
+        let mut rig = Rig::new(Spots::stone());
+        let inventory = Inventories::with(&[(0, STONE)]);
+        let mut probe = Probes::above(0, 0.0);
+        probe.hit = Some(UseHit { cell: [0, 0, 0], face: Face::Up, distance, replaceable: false });
+        assert_eq!(rig.call(&probe, &inventory, 0), UseCommand::Vanilla, "distance {distance}");
+        assert_eq!(rig.service.telemetry().placed, 0);
+        assert_eq!(rig.service.tried_len(), 0);
+    }
+}
+
+#[test]
+fn a_spot_in_front_of_the_hit_block_is_a_target() {
+    let mut rig = Rig::new(Spots::stone());
+    let inventory = Inventories::with(&[(0, STONE)]);
+    let mut probe = Probes::above(0, 0.0);
+    probe.hit = Some(UseHit { cell: [0, -1, 0], face: Face::Up, distance: 5.5, replaceable: false });
+    assert_eq!(rig.call(&probe, &inventory, 0), UseCommand::Place(Spots::on_floor(0)));
+}
+
+#[test]
+fn the_second_half_of_a_double_slab_is_a_target_when_its_single_slab_is_hit() {
+    for distance in Ulps::around(4.5) {
+        let mut rig = Rig::new(Spots::single("oak_double_slab"));
+        let inventory = Inventories::with(&[(0, b"minecraft:oak_slab")]);
+        assert_eq!(rig.call(&Probes::above(0, 0.0), &inventory, 0), UseCommand::Place(Spots::on_floor(0)));
+        rig.service.seen([0, 0, 0], b"minecraft:oak_slab", 0.1);
+        let mut probe = Probes::above(0, 2.0);
+        probe.hit = Some(UseHit { cell: [0, 0, 0], face: Face::Up, distance, replaceable: false });
+        let command = rig.call(&probe, &inventory, 0);
+        assert_eq!(command, UseCommand::Place(Spots::on_floor(0)), "distance {distance}");
+    }
+}
+
+#[test]
+fn a_filled_single_slab_spot_is_vanilla() {
+    let mut rig = Rig::new(Spots::single("oak_double_slab"));
+    let inventory = Inventories::with(&[(0, b"minecraft:oak_slab")]);
+    let mut probe = Probes::above(0, 0.0);
+    probe.hit = Some(UseHit { cell: [0, 0, 0], face: Face::Up, distance: 4.5, replaceable: false });
+    assert_eq!(rig.call(&probe, &inventory, 0), UseCommand::Vanilla);
+}
+
+#[test]
+fn the_cells_of_the_player_body_are_not_targets() {
+    let mut rig = Rig::new(GhostFixture::blocks(&[([0, 0, 0], [0, 2, 0])]));
+    let inventory = Inventories::with(&[(0, STONE)]);
+    let mut probe = Probes::above(0, 0.0);
+    probe.eye = [0.5, 2.6, 0.5];
+    probe.body = Some(([0, 1, 0], [0, 2, 0]));
+    assert_eq!(rig.call(&probe, &inventory, 0), UseCommand::Place(Spots::on_floor(0)));
+}
+
+#[test]
+fn a_placement_not_sent_counts_as_not_sent_only() {
+    let mut rig = Rig::new(Spots::row(2));
+    let inventory = Inventories::with(&[(0, STONE)]);
+    assert_eq!(rig.call(&Probes::above(0, 0.0), &inventory, 0), UseCommand::Place(Spots::on_floor(0)));
+    assert_eq!(rig.call(&Probes::above(1, 0.1), &inventory, 0), UseCommand::Place(Spots::on_floor(1)));
+    rig.service.not_sent([0, 0, 0]);
+    rig.service.not_sent([5, 5, 5]);
+    assert_eq!(rig.service.pending_len(), 1);
+    rig.service.expire(2.0);
+    let telemetry = rig.service.telemetry();
+    assert_eq!((telemetry.placed, telemetry.not_sent, telemetry.rejected), (1, 1, 1));
+}
+
+#[test]
+fn a_confirmed_block_broken_later_stays_confirmed() {
+    let mut rig = Rig::new(Spots::stone());
+    let inventory = Inventories::with(&[(0, STONE)]);
+    assert_eq!(rig.call(&Probes::above(0, 0.0), &inventory, 0), UseCommand::Place(Spots::on_floor(0)));
+    rig.service.seen([0, 0, 0], STONE, 0.1);
+    rig.service.seen([0, 0, 0], b"minecraft:air", 0.2);
+    rig.service.expire(2.0);
+    let telemetry = rig.service.telemetry();
+    assert_eq!((telemetry.confirmed, telemetry.rejected), (1, 0));
+}
+
+#[test]
+fn a_first_half_seen_as_a_double_slab_needs_no_second_half() {
+    let mut rig = Rig::new(Spots::single("oak_double_slab"));
+    let inventory = Inventories::with(&[(0, b"minecraft:oak_slab")]);
+    assert_eq!(rig.call(&Probes::above(0, 0.0), &inventory, 0), UseCommand::Place(Spots::on_floor(0)));
+    rig.service.seen([0, 0, 0], b"minecraft:oak_slab", 0.1);
+    rig.service.seen([0, 0, 0], b"minecraft:oak_double_slab", 0.2);
+    rig.service.seen([0, 0, 0], b"minecraft:air", 0.3);
+    rig.service.end_hold();
+    let mut probe = Probes::above(0, 2.0);
+    probe.hit = Some(UseHit { cell: [0, 0, 0], face: Face::Up, distance: 4.5, replaceable: false });
+    assert_eq!(rig.call(&probe, &inventory, 0), UseCommand::Vanilla);
+    assert_eq!(rig.service.telemetry().confirmed, 1);
 }

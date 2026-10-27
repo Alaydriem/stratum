@@ -10,6 +10,7 @@
 #include <mc/world/level/Level.h>
 #include <mc/world/level/block/Block.h>
 #include <mc/world/level/block/BlockType.h>
+#include <mc/world/phys/AABB.h>
 #include <mc/world/phys/HitResult.h>
 #include <mc/world/phys/HitResultType.h>
 
@@ -53,6 +54,7 @@ void ProbeReader::read(LocalPlayer& player, BlockSource& region, GameMode& gameM
         probe.dir[1] = dir.y / length;
         probe.dir[2] = dir.z / length;
     }
+    readBody(player, probe);
     probe.reach = gameMode.getMaxPickRange();
     switch (player.getPlayerGameType()) {
     case GameType::Survival:
@@ -68,6 +70,18 @@ void ProbeReader::read(LocalPlayer& player, BlockSource& region, GameMode& gameM
     probe.has_hit = false;
     if (length > MIN_LENGTH && walk(region, probe)) return;
     gameHit(player, region, probe);
+}
+
+// the cells the player's box overlaps, both inclusive; a box face on a cell edge does not reach into the next cell
+void ProbeReader::readBody(LocalPlayer& player, StUseProbe& probe) {
+    AABB const& box     = player.getAABB();
+    float const low[3]  = {box.min.x, box.min.y, box.min.z};
+    float const high[3] = {box.max.x, box.max.y, box.max.z};
+    for (int axis = 0; axis < 3; ++axis) {
+        probe.body_min[axis] = static_cast<int32_t>(std::floor(double(low[axis])));
+        probe.body_max[axis] = static_cast<int32_t>(std::ceil(double(high[axis]))) - 1;
+    }
+    probe.has_body = true;
 }
 
 // steps the ray from the eye cell to each cell it enters, nearest first, and stops at the first cell past the reach
@@ -92,7 +106,8 @@ bool ProbeReader::walk(BlockSource& region, StUseProbe& probe) {
         next[axis]  = (d > 0.0 ? (cell[axis] + 1 - origin) : (origin - cell[axis])) * delta[axis];
     }
     for (int i = 0; i < MAX_CROSSINGS; ++i) {
-        int axis = next[0] < next[1] ? (next[0] < next[2] ? 0 : 2) : (next[1] < next[2] ? 1 : 2);
+        // ties step x, then y, then z, the same order as the core ghost walk
+        int axis = (next[0] <= next[1] && next[0] <= next[2]) ? 0 : (next[1] <= next[2] ? 1 : 2);
         double t = next[axis];
         if (t > probe.reach) return false;
         cell[axis] += step[axis];

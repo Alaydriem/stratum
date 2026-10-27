@@ -21,6 +21,8 @@ thiserror.workspace = true
 curia.workspace = true
 hcl-rs.workspace = true
 crossbeam-channel.workspace = true
+serde_json.workspace = true
+png.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
@@ -32,4 +34,8 @@ harness = false
 
 [[bench]]
 name = "ghost_ray"
+harness = false
+
+[[bench]]
+name = "preview_render"
 harness = false

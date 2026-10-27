@@ -1,6 +1,7 @@
 #include "easyplace/UseExecutor.h"
 
 #include "bridge/ModLog.h"
+#include "bridge/RustBridge.h"
 #include "easyplace/StackRequest.h"
 #include "ghost/GhostRenderer.h"
 #include "state/FrameStatusReader.h"
@@ -41,7 +42,7 @@ constexpr int     HOTBAR_SLOTS = 9;
 void UseExecutor::run(IClientInstance& client, LocalPlayer& player, StUseCommand const& command) {
     switch (command.kind) {
     case KIND_SELECT:
-        if (select(player, command.slot)) place(player, command);
+        if (!select(player, command.slot) || !place(player, command)) notSent(command);
         break;
     case KIND_SWAP:
         StackRequest::swap(client, player, command.from, command.to);
@@ -50,7 +51,7 @@ void UseExecutor::run(IClientInstance& client, LocalPlayer& player, StUseCommand
         StackRequest::pick(client, player, GhostRenderer::paletteBlock(command.palette_id), command.slot);
         break;
     case KIND_PLACE:
-        place(player, command);
+        if (!place(player, command)) notSent(command);
         break;
     default:
         break;
@@ -92,10 +93,11 @@ bool UseExecutor::select(LocalPlayer& player, uint8_t slot) {
     return false;
 }
 
-// clicks the neighbour's face that points at the spot, at the point core chose, the way the game's own use does
-void UseExecutor::place(LocalPlayer& player, StUseCommand const& command) {
+// clicks the neighbour's face that points at the spot, at the point core chose, the way the game's own use does;
+// true when the game built
+bool UseExecutor::place(LocalPlayer& player, StUseCommand const& command) {
     GameMode* gameMode = player.mGameMode.get();
-    if (!gameMode || command.face >= FACE_COUNT) return;
+    if (!gameMode || command.face >= FACE_COUNT) return false;
     BlockPos   neighbour(command.neighbour[0], command.neighbour[1], command.neighbour[2]);
     HitResult& hit    = player.getLevel().getHitResult();
     HitResult  saved  = hit;
@@ -107,10 +109,15 @@ void UseExecutor::place(LocalPlayer& player, StUseCommand const& command) {
         float(neighbour.y) + command.click[1],
         float(neighbour.z) + command.click[2]
     );
-    sOwnBuild = true;
-    gameMode->buildBlock(neighbour, command.face, HandSlot::Mainhand, sSimTick);
-    sOwnBuild = false;
-    hit       = saved;
+    sOwnBuild  = true;
+    bool built = gameMode->buildBlock(neighbour, command.face, HandSlot::Mainhand, sSimTick);
+    sOwnBuild  = false;
+    hit        = saved;
+    return built;
+}
+
+void UseExecutor::notSent(StUseCommand const& command) {
+    if (StHandle* handle = RustBridge::handle()) st_use_not_sent(handle, &command.spot);
 }
 
 } // namespace stratum

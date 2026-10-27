@@ -6,7 +6,13 @@ use levi_ui::widget::{Banner, BannerTone, ButtonKind, EmptyState};
 use stratum_core::structs::action::LibraryAction;
 use stratum_core::structs::snapshot::LibrarySnapshot;
 
-use super::{ImportButton, ImportNotices, MarkerActions, ProjectPage, StructureListPage, StructurePage};
+use std::sync::Arc;
+
+use stratum_core::services::preview::PreviewService;
+
+use super::{
+    ImportButton, ImportNotices, MarkerActions, ProjectPage, StructureListPage, StructurePage, StructurePreview,
+};
 use crate::message::StratumMessage;
 use crate::state::{LibraryUiState, Page};
 
@@ -15,11 +21,21 @@ use crate::state::{LibraryUiState, Page};
 pub struct DetailView {
     project_page: ProjectPage,
     structure_page: StructurePage,
+    // The 3D preview in the structure card, when the host gave a preview service.
+    preview: Option<StructurePreview>,
 }
 
 impl DetailView {
     pub fn new() -> Self {
-        Self { project_page: ProjectPage::new(), structure_page: StructurePage::new() }
+        Self { project_page: ProjectPage::new(), structure_page: StructurePage::new(), preview: None }
+    }
+
+    pub fn with_preview(service: Arc<PreviewService>) -> Self {
+        Self {
+            project_page: ProjectPage::new(),
+            structure_page: StructurePage::new(),
+            preview: Some(StructurePreview::new(service)),
+        }
     }
 
     pub fn show(
@@ -59,7 +75,7 @@ impl DetailView {
         match state.page {
             Page::Project(id) => {
                 if let Some(project) = snapshot.projects.iter().find(|project| project.id == id) {
-                    self.project_page.show(ui, snapshot, project, state, out);
+                    self.project_page.show(ui, snapshot, project, state, out, self.preview.as_mut());
                 }
             }
             Page::Structure(id) => {
@@ -68,7 +84,7 @@ impl DetailView {
                     .iter()
                     .chain(snapshot.projects.iter().flat_map(|project| project.structures.iter()));
                 if let Some(row) = rows.into_iter().find(|row| row.id == id) {
-                    self.structure_page.show(ui, snapshot, row, state, out);
+                    self.structure_page.show(ui, snapshot, row, state, out, self.preview.as_mut());
                 }
             }
             Page::All | Page::Unsorted => StructureListPage::show(ui, snapshot, state.page, state),

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use egui::{Align, Area, Context, Id, Layout, Margin, Order, Rect, Sense, Ui, UiBuilder, Vec2};
 use levi_i18n::text::{Args, Text};
 use levi_ui::draw::Draw;
@@ -5,6 +7,7 @@ use levi_ui::icon::Icon;
 use levi_ui::tokens::rule::Elevation;
 use levi_ui::tokens::{ColorToken, color};
 use levi_ui::widget::{ChipTone, IconButton, PageHeader, PageHeaderLead, Surface, SurfaceLevel};
+use stratum_core::services::preview::PreviewService;
 use stratum_core::structs::action::LibraryAction;
 use stratum_core::structs::snapshot::LibrarySnapshot;
 
@@ -42,6 +45,11 @@ impl LibraryView {
 
     pub fn new() -> Self {
         Self { sidebar: SidebarView::new(), detail: DetailView::new() }
+    }
+
+    // A menu whose structure card shows the 3D preview the service draws.
+    pub fn with_preview(service: Arc<PreviewService>) -> Self {
+        Self { sidebar: SidebarView::new(), detail: DetailView::with_preview(service) }
     }
 
     // Draws the menu over the screen and returns the panel's rect, for the host's input layer.

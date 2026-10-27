@@ -1,23 +1,25 @@
 use crate::services::PlaceNeeds;
-use crate::structs::easy_place::PlaceNeed;
+use crate::structs::easy_place::{PlaceNeed, RayLimits};
 use crate::structs::ghost::{GhostBuild, GhostView};
 
 // Finds the first ghost cell along a view ray that still needs a block.
 pub struct GhostRay;
 
 impl GhostRay {
-    // The first cell along `dir` from `eye`, within `max_distance`, whose block has a `Place` need
-    // and, in a layer view, lies on that layer. Cells that are not targets are passed through. A
-    // ray that starts inside a target returns that cell. Distance is along the normalized `dir`.
-    // A zero or non-finite `dir` gives None. Allocates nothing.
+    // The first cell along `dir` from `eye`, within `limits.max_distance`, whose block has a `Place`
+    // need and, in a layer view, lies on that layer. Cells that are not targets, and cells of the
+    // player body, are passed through. A ray that starts inside a target returns that cell. The walk
+    // ends before the stop cell, or in it when `limits.enter_stop` is set. Distance is along the
+    // normalized `dir`. A zero or non-finite `dir` gives None. Allocates nothing.
     pub fn first_spot(
         build: &GhostBuild,
         view: GhostView,
         needs: &PlaceNeeds,
         eye: [f64; 3],
         dir: [f64; 3],
-        max_distance: f64,
+        limits: &RayLimits,
     ) -> Option<([i32; 3], u16)> {
+        let max_distance = limits.max_distance;
         let length = (dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]).sqrt();
         if !length.is_finite() || length <= 0.0 || !max_distance.is_finite() || eye.iter().any(|v| !v.is_finite()) {
             return None;
@@ -63,7 +65,14 @@ impl GhostRay {
             }
         }
 
+        let has_stop = limits.stop.is_some();
+        let stop = limits.stop.unwrap_or_default();
+        let enter_stop = limits.enter_stop;
         loop {
+            let at_stop = has_stop && cell[0] == stop[0] && cell[1] == stop[1] && cell[2] == stop[2];
+            if at_stop && !enter_stop {
+                return None;
+            }
             let on_layer = match view {
                 GhostView::Whole => true,
                 GhostView::Layer(y) => cell[1] == y,
@@ -71,8 +80,12 @@ impl GhostRay {
             if on_layer
                 && let Some(id) = build.block_at(cell)
                 && matches!(needs.need(id), PlaceNeed::Place { .. })
+                && !limits.in_body(cell)
             {
                 return Some((cell, id));
+            }
+            if at_stop {
+                return None;
             }
             let axis = if next[0] <= next[1] && next[0] <= next[2] {
                 0

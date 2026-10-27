@@ -3,7 +3,8 @@ use stratum_core::structs::easy_place::{Face, GameMode, SwapAnswer, UseHit, UseP
 // What the shim reads from the game on one use call, passed to st_use_aim and again to st_use_decide.
 // `face` indexes the faces in the order Down, Up, North, South, West, East. `game_mode` is 0 survival,
 // 1 creative, 2 anything else. `swap_answer` is 0 for no answer yet, 1 accepted, 2 refused. The hit fields
-// are read only when `has_hit` is set.
+// are read only when `has_hit` is set. `body_min` and `body_max` are the cells the player body fills, both
+// inclusive, read only when `has_body` is set; a box whose min is above its max on any axis reads as no body.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct StUseProbe {
@@ -19,6 +20,9 @@ pub struct StUseProbe {
     pub hit_face: u8,
     pub hit_distance: f64,
     pub hit_replaceable: bool,
+    pub has_body: bool,
+    pub body_min: [i32; 3],
+    pub body_max: [i32; 3],
     pub swap_answer: u8,
 }
 
@@ -45,6 +49,8 @@ impl From<&StUseProbe> for UseProbe {
             }),
             _ => None,
         };
+        let ordered = (0..3).all(|axis| probe.body_min[axis] <= probe.body_max[axis]);
+        let body = (probe.has_body && ordered).then_some((probe.body_min, probe.body_max));
         Self {
             time_seconds: probe.time_seconds,
             pressed: probe.pressed,
@@ -54,6 +60,7 @@ impl From<&StUseProbe> for UseProbe {
             reach: probe.reach,
             game_mode,
             hit,
+            body,
             swap_answer,
         }
     }

@@ -1,5 +1,5 @@
 use stratum_core::structs::easy_place::{Face, UseCommand};
-use stratum_ffi::api::easy_place::{st_block_seen, st_use_aim, st_use_decide, st_use_released};
+use stratum_ffi::api::easy_place::{st_block_seen, st_use_aim, st_use_decide, st_use_not_sent, st_use_released};
 use stratum_ffi::services::StBoundary;
 use stratum_ffi::types::{StInventorySlot, StSpotWorld, StStatus, StStr, StUseCommand};
 
@@ -33,6 +33,9 @@ fn null_pointers_return_invalid_argument() {
     assert_eq!(decide(session.handle, &probe, broken.as_ptr(), 1, &mut out), StStatus::InvalidArgument);
 
     assert_eq!(st_use_released(std::ptr::null_mut()), StStatus::InvalidArgument);
+    assert_eq!(st_use_not_sent(std::ptr::null_mut(), &spot), StStatus::InvalidArgument);
+    assert_eq!(st_use_not_sent(session.handle, std::ptr::null()), StStatus::InvalidArgument);
+    assert_eq!(st_use_not_sent(session.handle, &spot), StStatus::Ok);
     assert_eq!(st_block_seen(std::ptr::null_mut(), 1, 2, 3, name, 1.0), StStatus::InvalidArgument);
     assert_eq!(st_block_seen(session.handle, 1, 2, 3, nameless, 1.0), StStatus::InvalidArgument);
 }
@@ -54,6 +57,7 @@ fn a_panic_does_not_cross_the_boundary() {
     let decided = st_use_decide(session.handle, &probe, std::ptr::null(), std::ptr::null(), 0, 0, &mut out);
     assert_eq!(decided, StStatus::Failed);
     assert_eq!(st_use_released(session.handle), StStatus::Failed);
+    assert_eq!(st_use_not_sent(session.handle, &spot), StStatus::Failed);
     assert_eq!(st_block_seen(session.handle, 1, 2, 3, name, 1.0), StStatus::Failed);
     assert_eq!(StSession::logged("panic stopped at the C boundary").len(), 1);
 }

@@ -15,6 +15,7 @@ egui = { version = "=0.37.0", default-features = false, features = ["default_fon
 serde = { version = "1.0.229", features = ["derive"] }
 crossbeam-channel = "0.5.17"
 serde_json = "1.0.154"
+png = "0.18.1"
 chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
 tempfile = "3.27.0"
 criterion = "=0.8.2"

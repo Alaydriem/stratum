@@ -9,6 +9,7 @@ pub mod library;
 pub mod marker;
 pub mod material;
 pub mod nbt;
+pub mod preview;
 pub mod snapshot;
 pub mod structure;
 pub mod worker_wakeups;

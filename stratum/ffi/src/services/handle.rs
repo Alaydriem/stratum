@@ -6,6 +6,8 @@ use std::sync::{Arc, Mutex};
 use amm_client::link::ApiTable;
 use amm_core::errors::LinkError;
 use stratum_core::services::StratumController;
+use stratum_core::services::preview::PreviewService;
+use stratum_core::structs::preview::PreviewSource;
 
 use super::{HandleState, ManagerSession, SharedGhost, SharedUi};
 
@@ -24,7 +26,9 @@ impl StHandle {
     // gives the defaults. `config_dir` is the mod's LeviLamina config folder and `data_dir` the folder for the
     // library, both absolute paths.
     pub fn connect(table: ApiTable, config_dir: &Path, data_dir: &Path) -> Result<Self, LinkError> {
-        let shared = SharedUi::new_shared();
+        let source = PreviewSource::locate(data_dir);
+        let preview = PreviewService::new_shared(source);
+        let shared = SharedUi::new_shared_with_preview(preview);
         let session = ManagerSession::connect(table, config_dir, Arc::clone(&shared))?;
         let config = session.config().unwrap_or_default();
         shared.meter().set_enabled(config.debug.telemetry);

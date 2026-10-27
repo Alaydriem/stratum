@@ -6,7 +6,7 @@ use levi_ui::widget::{SectionHeader, Surface, SurfaceLevel, ValueRow};
 use stratum_core::structs::marker::MarkerTarget;
 use stratum_core::structs::snapshot::{LibrarySnapshot, StructureRow};
 
-use super::{CardFooter, ItemActions, MarkerActions, SizeBox};
+use super::{CardFooter, ItemActions, MarkerActions, SizeBox, StructurePreview};
 use crate::message::StratumMessage;
 use crate::presenter::DigitGroups;
 use crate::state::{DialogItem, LibraryUiState};
@@ -25,13 +25,17 @@ impl FactsPanel {
         project: Option<&str>,
         state: &mut LibraryUiState,
         height: f32,
+        preview: Option<&mut StructurePreview>,
     ) {
         let bottom = ui.cursor().top() + height;
         let frame = Surface::frame(SurfaceLevel::Raised, Elevation::Flat);
         let inset = CardFooter::inset(&frame);
         frame.show(ui, |ui| {
             ui.set_width(ui.available_width());
-            SizeBox::show(ui, row.size);
+            match preview {
+                Some(preview) => preview.show(ui, row),
+                None => SizeBox::show(ui, row.size),
+            }
             ui.add_space(<spacing::M as SpacingToken>::VALUE);
             SectionHeader::new(Text::message(StratumMessage::StructureFacts)).divider(false).show(ui);
             let project = match project {

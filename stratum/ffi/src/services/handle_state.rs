@@ -129,6 +129,11 @@ impl HandleState {
         self.controller.block_seen(cell, block, time_seconds);
     }
 
+    // The shim did not carry out the placement at `spot`.
+    pub fn use_not_sent(&mut self, spot: [i32; 3]) {
+        self.controller.use_not_sent(spot);
+    }
+
     // The use key went up.
     pub fn use_released(&mut self) {
         self.controller.use_released();
@@ -238,6 +243,7 @@ impl HandleState {
             easy_place_placed: easy_place.placed,
             easy_place_confirmed: easy_place.confirmed,
             easy_place_rejected: easy_place.rejected,
+            easy_place_not_sent: easy_place.not_sent,
             easy_place_wrong: easy_place.wrong,
             easy_place_cancelled_missing: easy_place.cancelled_missing,
             easy_place_cancelled_no_neighbour: easy_place.cancelled_no_neighbour,
