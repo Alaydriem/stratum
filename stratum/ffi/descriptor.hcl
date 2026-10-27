@@ -182,14 +182,6 @@ section "memory" {
 section "ghost" {
   title = "Ghost blocks"
 
-  field "ghost.demo" {
-    label   = "Demo mode"
-    help    = "Shows the structure one layer at a time, bottom to top"
-    kind    = "bool"
-    default = false
-    apply   = "Live"
-  }
-
   field "ghost.miniature" {
     label   = "Mini ghost"
     help    = "Shows the whole structure in miniature at its lowest corner; off shows a structure block there"

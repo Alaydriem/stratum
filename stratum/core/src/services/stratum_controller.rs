@@ -364,7 +364,7 @@ impl StratumController {
         self.ghost.block_changed(position);
     }
 
-    // The ghost settings changed while the game runs. Demo, draw distance, cells per
+    // The ghost settings changed while the game runs. Draw distance, cells per
     // frame and the mini ghost apply from the next tick; the mesh budget waits for a restart.
     pub fn set_ghost_config(&mut self, config: GhostConfig) {
         self.ghost.reconfigure(config);

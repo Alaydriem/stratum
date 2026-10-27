@@ -99,16 +99,7 @@ fn descriptor_passes_the_manager_checker() {
             ("library", vec!["library.max_structures", "library.max_projects", "markers.max_per_world"]),
             ("import", vec!["import.max_file_mb", "import.inbox_poll_seconds"]),
             ("memory", vec!["cache.budget_mb"]),
-            (
-                "ghost",
-                vec![
-                    "ghost.demo",
-                    "ghost.miniature",
-                    "ghost.draw_distance",
-                    "ghost.mesh_budget_mb",
-                    "ghost.cells_per_frame"
-                ]
-            ),
+            ("ghost", vec!["ghost.miniature", "ghost.draw_distance", "ghost.mesh_budget_mb", "ghost.cells_per_frame"]),
             ("debug", vec!["debug.telemetry"]),
         ]
     );
@@ -154,7 +145,6 @@ fn only_the_key_telemetry_and_ghost_settings_apply_live() {
             ("keys.hud_left", ApplyMode::Live),
             ("keys.hud_right", ApplyMode::Live),
             ("keys.hud_mode", ApplyMode::Live),
-            ("ghost.demo", ApplyMode::Live),
             ("ghost.miniature", ApplyMode::Live),
             ("ghost.draw_distance", ApplyMode::Live),
             ("ghost.cells_per_frame", ApplyMode::Live),

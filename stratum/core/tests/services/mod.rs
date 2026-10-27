@@ -1,5 +1,4 @@
 mod atomic_file;
-mod demo_clock;
 mod ghost_assembler;
 mod ghost_scheduler;
 mod ghost_sections;

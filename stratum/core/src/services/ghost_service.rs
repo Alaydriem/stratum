@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::config::GhostConfig;
 use crate::errors::GhostError;
-use crate::services::{DemoClock, GhostAssembler, GhostScheduler, GhostSections, GhostTurnWorker, SectionScan};
+use crate::services::{GhostAssembler, GhostScheduler, GhostSections, GhostTurnWorker, SectionScan};
 use crate::structs::frame::FrameStatus;
 use crate::structs::ghost::source::BuildSource;
 use crate::structs::ghost::{GhostBuild, GhostFrame, GhostReport, GhostView, MiniatureGroups, SectionKey, SectionPart};
@@ -31,7 +31,6 @@ use crate::structs::structure::Structure;
 pub struct GhostService {
     config: GhostConfig,
     scheduler: GhostScheduler,
-    clock: DemoClock,
     // The generation of the next build or world; it moves on every build change and world change.
     revision: u64,
     world: Option<(String, i32)>,
@@ -125,7 +124,6 @@ impl GhostService {
     pub fn with_turn_worker(config: GhostConfig, turner: GhostTurnWorker) -> Self {
         Self {
             scheduler: GhostScheduler::new(&config),
-            clock: DemoClock::new(GhostConfig::DEMO_STEP_SECONDS),
             config,
             revision: 0,
             world: None,
@@ -174,7 +172,7 @@ impl GhostService {
         }
     }
 
-    // Takes the settings that apply while the game runs: demo, draw distance, cells per
+    // Takes the settings that apply while the game runs: draw distance, cells per
     // frame and the mini ghost. The mesh budget sizes the slot table and stays as it was until a restart. A new frame
     // allowance scans the build again, because it decides where a section splits. The old sections
     // stay in use until the new scan is done, so only the keys whose split changed are built again.
@@ -184,7 +182,6 @@ impl GhostService {
             return;
         }
         let rescan = config.cells_per_frame() != self.config.cells_per_frame();
-        let restep = config.demo != self.config.demo;
         self.scheduler.set_cells_per_frame(config.cells_per_frame());
         self.config = config;
         if rescan && let Some(build) = self.build.as_ref() {
@@ -195,9 +192,6 @@ impl GhostService {
                 self.rescanned = Some((Vec::new(), Vec::new()));
             }
             self.scan = Some(SectionScan::new(build));
-        }
-        if restep {
-            self.clock = DemoClock::new(GhostConfig::DEMO_STEP_SECONDS);
         }
     }
 
@@ -425,11 +419,7 @@ impl GhostService {
                 );
             }
         }
-        let view = if self.config.demo {
-            GhostView::Layer(self.clock.layer(status.time_seconds, build.world_min[1], build.world_max[1]))
-        } else {
-            Self::marker_view(&marker.view, build)
-        };
+        let view = Self::marker_view(&marker.view, build);
         if self.view.is_some_and(|planned| planned != view) {
             self.scheduler.hold_unwanted();
         }
@@ -796,7 +786,6 @@ impl GhostService {
         self.revision = build.revision;
         self.rotation = rotation;
         self.scan = Some(SectionScan::new(&build));
-        self.clock = DemoClock::new(GhostConfig::DEMO_STEP_SECONDS);
         self.build = Some(build);
     }
 

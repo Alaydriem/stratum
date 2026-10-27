@@ -956,12 +956,6 @@ impl GhostConfigs {
         config
     }
 
-    fn demo() -> StratumConfig {
-        let mut config = StratumConfig::default();
-        config.ghost.demo = true;
-        config
-    }
-
     // A mesh budget that holds four slots.
     fn tight() -> StratumConfig {
         let mut config = StratumConfig::default();
@@ -1183,24 +1177,6 @@ fn failed_load_draws_nothing_and_does_not_panic() {
     ControllerHarness::tick_until_materials_ready(&mut controller, &Frames::in_world(GhostScene::WORLD, 3.0));
     assert_eq!(controller.snapshot().materials_failed, Some(MaterialScope::Structure(id)));
     assert!(controller.snapshot().materials.is_none());
-}
-
-#[test]
-fn demo_mode_steps_layers_on_the_frame_clock() {
-    let data = tempfile::tempdir().unwrap();
-    let mut controller = GhostScene::start(data.path(), GhostConfigs::demo(), [2, 3, 2]);
-    GhostScene::tick_until_jobs(&mut controller, 10.0);
-    let jobs = &controller.ghost_frame().jobs;
-    let first = jobs.iter().find(|job| GhostScene::is_full(job.key.part)).map(|job| job.key.layer);
-    assert_eq!(first, Some(Some(64)));
-
-    for (time, layer) in [(10.5, 65), (11.0, 66), (11.5, 64)] {
-        controller.tick(&Frames::in_world(GhostScene::WORLD, time));
-        let frame = controller.ghost_frame();
-        let full: Vec<_> = frame.jobs.iter().filter(|job| GhostScene::is_full(job.key.part)).collect();
-        assert!(!full.is_empty(), "no job at {time}");
-        assert!(full.iter().all(|job| job.key.layer == Some(layer)), "wrong layer at {time}");
-    }
 }
 
 #[test]

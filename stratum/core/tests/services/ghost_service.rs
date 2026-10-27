@@ -564,20 +564,6 @@ fn a_layer_past_the_top_draws_the_whole_build() {
 }
 
 #[test]
-fn demo_mode_still_overrides_the_marker_layer() {
-    let mut rig = Rig::with_config(GhostConfig { demo: true, ..GhostConfig::default() });
-    let marker = Rig::layer_marker(2);
-    let loaded = [(7, GhostFixture::structure([2, 3, 2], &["stone"; 12]))];
-    rig.update(Some(&marker), &[]);
-
-    let (keys, _, _) = rig.run_to_rest(&marker, &loaded);
-
-    let full = Rig::full_keys(&keys);
-    assert!(!full.is_empty());
-    assert!(full.iter().all(|key| key.layer == Some(64)));
-}
-
-#[test]
 fn frame_opacity_follows_the_marker_step() {
     let mut rig = Rig::new();
     let mut marker = Rig::marker(1, Rotation::R0);
@@ -1071,22 +1057,6 @@ fn layer_view_draws_the_marker_and_no_miniature() {
     assert_eq!(draws.len(), 1);
     assert_eq!(draws[0].origin, [-1, 64, -1]);
     assert_eq!(draws[0].offset, [0; 3]);
-    assert_eq!(draws[0].scale, 1.0);
-    assert!(rig.miniature_draws().is_empty());
-}
-
-#[test]
-fn demo_mode_draws_the_marker() {
-    let mut rig = Rig::with_config(GhostConfig { demo: true, ..GhostConfig::default() });
-    let marker = Rig::marker(1, Rotation::R0);
-    let loaded = [(7, GhostFixture::structure([2, 3, 2], &["stone"; 12]))];
-    rig.update(Some(&marker), &[]);
-
-    rig.run_to_rest(&marker, &loaded);
-
-    let draws = rig.marker_draws();
-    assert_eq!(draws.len(), 1);
-    assert_eq!(draws[0].origin, [-1, 64, -1]);
     assert_eq!(draws[0].scale, 1.0);
     assert!(rig.miniature_draws().is_empty());
 }

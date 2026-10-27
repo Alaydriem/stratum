@@ -2,8 +2,6 @@
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
 #[serde(default)]
 pub struct GhostConfig {
-    // Steps through the structure one layer at a time instead of showing it whole.
-    pub demo: bool,
     // Draw distance in chunks. 0 follows the game's render distance.
     pub draw_distance: u32,
     // GPU memory the ghost meshes may hold, in MiB.
@@ -15,8 +13,6 @@ pub struct GhostConfig {
 }
 
 impl GhostConfig {
-    // Seconds a layer stays up in demo mode.
-    pub const DEMO_STEP_SECONDS: f64 = 0.5;
     // The smallest mesh budget: 1 MiB.
     pub const MIN_BUDGET_BYTES: u64 = 1024 * 1024;
     // The smallest frame allowance; the scheduler still hands out one job per frame below it.
@@ -37,6 +33,6 @@ impl GhostConfig {
 
 impl Default for GhostConfig {
     fn default() -> Self {
-        Self { demo: false, draw_distance: 0, mesh_budget_mb: 1024, cells_per_frame: 600, miniature: true }
+        Self { draw_distance: 0, mesh_budget_mb: 1024, cells_per_frame: 600, miniature: true }
     }
 }

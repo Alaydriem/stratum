@@ -1,6 +1,5 @@
 pub mod atomic_file;
 mod cache_entry;
-pub mod demo_clock;
 pub mod ghost_assembler;
 pub mod ghost_scheduler;
 pub mod ghost_sections;
@@ -30,7 +29,6 @@ pub mod structure_importer;
 pub mod structure_parser;
 
 pub use atomic_file::AtomicFile;
-pub use demo_clock::DemoClock;
 pub use ghost_assembler::GhostAssembler;
 pub use ghost_scheduler::GhostScheduler;
 pub use ghost_sections::GhostSections;

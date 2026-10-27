@@ -1,4 +1,4 @@
-use super::{CacheConfig, DebugConfig, GhostConfig, ImportSettings, LibraryConfig, MarkerConfig};
+use super::{CacheConfig, DebugConfig, EasyPlaceConfig, GhostConfig, ImportSettings, LibraryConfig, MarkerConfig};
 
 #[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
 #[serde(default)]
@@ -8,5 +8,6 @@ pub struct StratumConfig {
     pub import: ImportSettings,
     pub cache: CacheConfig,
     pub ghost: GhostConfig,
+    pub easy_place: EasyPlaceConfig,
     pub debug: DebugConfig,
 }
