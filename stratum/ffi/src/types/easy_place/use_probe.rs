@@ -1,4 +1,5 @@
-use stratum_core::structs::easy_place::{Face, GameMode, SwapAnswer, UseHit, UseProbe};
+use stratum_core::structs::block::Face;
+use stratum_core::structs::easy_place::{GameMode, SwapAnswer, UseHit, UseProbe};
 
 // What the shim reads from the game on one use call, passed to st_use_aim and again to st_use_decide.
 // `face` indexes the faces in the order Down, Up, North, South, West, East. `game_mode` is 0 survival,

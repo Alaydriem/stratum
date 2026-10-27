@@ -1,4 +1,5 @@
-use stratum_core::structs::easy_place::{Face, GameMode, SwapAnswer, UseProbe};
+use stratum_core::structs::block::Face;
+use stratum_core::structs::easy_place::{GameMode, SwapAnswer, UseProbe};
 use stratum_ffi::types::StUseProbe;
 
 fn probe() -> StUseProbe {

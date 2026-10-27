@@ -7,7 +7,7 @@ use super::SidebarRow;
 pub struct SidebarRows;
 
 impl SidebarRows {
-    // All structures, each project by name, Unsorted, then the markers: the active one first, then nearest first.
+    // All structures, each project by name, Unsorted, then the markers: the active one first, then by name.
     pub fn build(snapshot: &LibrarySnapshot) -> Vec<SidebarRow> {
         let mut rows = vec![SidebarRow::All { count: Self::count(snapshot.all_count) }];
 
@@ -26,7 +26,7 @@ impl SidebarRows {
         markers.sort_by(|a, b| {
             b.active
                 .cmp(&a.active)
-                .then(a.distance.cmp(&b.distance))
+                .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
                 .then_with(|| a.name.cmp(&b.name))
                 .then(a.id.cmp(&b.id))
         });
@@ -35,7 +35,7 @@ impl SidebarRows {
             name: marker.name.clone(),
             target: marker.target,
             target_name: marker.target_name.clone(),
-            distance: marker.distance,
+            origin: marker.origin,
             active: marker.active,
             missing: marker.state == TargetState::Missing,
         }));

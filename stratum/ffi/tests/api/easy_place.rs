@@ -1,4 +1,5 @@
-use stratum_core::structs::easy_place::{Face, UseCommand};
+use stratum_core::structs::block::Face;
+use stratum_core::structs::easy_place::UseCommand;
 use stratum_ffi::api::easy_place::{st_block_seen, st_use_aim, st_use_decide, st_use_not_sent, st_use_released};
 use stratum_ffi::services::StBoundary;
 use stratum_ffi::types::{StInventorySlot, StSpotWorld, StStatus, StStr, StUseCommand};

@@ -14,7 +14,7 @@ use crate::entry_fixture::EntryFixture;
 pub struct TargetBuild;
 
 impl TargetBuild {
-    // More than a mesh holds per cell: spike round 8 measured 359 MB for the target's 1.87 M cells.
+    // More than a mesh holds per cell: the target's 1.87 M cells measured 359 MB.
     pub const BYTES_PER_CELL: u64 = 300;
 
     pub fn at(origin: [i32; 3]) -> GhostBuild {

@@ -32,13 +32,13 @@ fn empty_library_still_has_all_and_unsorted() {
 }
 
 #[test]
-fn markers_sort_active_first_then_by_distance() {
+fn markers_sort_active_first_then_by_name_ignoring_case() {
     let mut snapshot = LibrarySnapshot::empty();
     snapshot.markers = vec![
-        SnapshotFixture::marker(1, "Far", 300, false, TargetState::Ok),
-        SnapshotFixture::marker(2, "Near", 5, false, TargetState::Ok),
-        SnapshotFixture::marker(3, "Active far", 900, true, TargetState::Ok),
-        SnapshotFixture::marker(4, "Mid", 40, false, TargetState::Ok),
+        SnapshotFixture::marker(1, "mill", [5, 64, -340], false, TargetState::Ok),
+        SnapshotFixture::marker(2, "Gate", [300, 64, -340], false, TargetState::Ok),
+        SnapshotFixture::marker(3, "Zenith", [900, 64, -340], true, TargetState::Ok),
+        SnapshotFixture::marker(4, "Barn", [40, 64, -340], false, TargetState::Ok),
     ];
     let ids: Vec<MarkerId> = SidebarRows::build(&snapshot)
         .into_iter()
@@ -47,15 +47,15 @@ fn markers_sort_active_first_then_by_distance() {
             _ => None,
         })
         .collect();
-    assert_eq!(ids, [MarkerId(3), MarkerId(2), MarkerId(4), MarkerId(1)]);
+    assert_eq!(ids, [MarkerId(3), MarkerId(4), MarkerId(2), MarkerId(1)]);
 }
 
 #[test]
 fn missing_target_marker_row_is_flagged() {
     let mut snapshot = LibrarySnapshot::empty();
     snapshot.markers = vec![
-        SnapshotFixture::marker(1, "Lighthouse", 214, false, TargetState::Missing),
-        SnapshotFixture::marker(2, "East wing", 12, false, TargetState::Ok),
+        SnapshotFixture::marker(1, "Lighthouse", [214, 64, -340], false, TargetState::Missing),
+        SnapshotFixture::marker(2, "East wing", [12, 64, -340], false, TargetState::Ok),
     ];
     let flags: Vec<(String, bool)> = SidebarRows::build(&snapshot)
         .into_iter()

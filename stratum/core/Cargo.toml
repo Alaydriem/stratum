@@ -39,3 +39,7 @@ harness = false
 [[bench]]
 name = "preview_render"
 harness = false
+
+[[bench]]
+name = "stratum_controller"
+harness = false

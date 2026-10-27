@@ -1,3 +1,4 @@
+mod block;
 mod ghost;
 mod marker;
 mod material;

@@ -3,11 +3,18 @@ use std::sync::Arc;
 
 use super::{ShapeRules, TexturePack};
 use crate::errors::PreviewError;
-use crate::structs::preview::{BlockFace, BlockLook, BlockShape, BlockTexture, Occlusion, PreviewMesh, PreviewQuad};
+use crate::structs::block::Face;
+use crate::structs::preview::{
+    BlockLook, BlockShape, BlockTexture, Occlusion, PreviewMesh, PreviewQuad, PreviewShade, PreviewStop,
+};
 use crate::structs::structure::{BlockLayer, StateValue, Structure};
 
-// Builds the quads of a structure's visible faces. A face against a neighbour that hides it is left out.
-pub struct PreviewMesher;
+// Builds the quads of a structure's visible faces. A face against a neighbour that hides it is left out. A mesh
+// holds at most `max_quads` quads; the stop is checked once per row of cells.
+pub struct PreviewMesher {
+    max_quads: usize,
+    stop: PreviewStop,
+}
 
 impl PreviewMesher {
     // The longest side the mesh can place: corners are i16 sixteenths.
@@ -15,19 +22,27 @@ impl PreviewMesher {
     const MISSING: [u8; 4] = [160, 160, 160, 255];
     // The light of a cross plant, which the game draws a little darker than a top face.
     const CROSS_SHADE: u8 = 230;
+    // The most quads one cell gives: a stairs block is two boxes of six faces.
+    const CELL_QUADS: usize = 12;
 
-    pub fn build(structure: &Structure, pack: &mut TexturePack) -> Result<PreviewMesh, PreviewError> {
+    pub fn new(max_quads: usize, stop: PreviewStop) -> Self {
+        Self { max_quads, stop }
+    }
+
+    // The visible faces of `structure`; `Stopped` when the stop was set during the build.
+    pub fn build(&self, structure: &Structure, pack: &mut TexturePack) -> Result<PreviewMesh, PreviewError> {
         let size = structure.size;
         if size.x > Self::MAX_SIDE || size.y > Self::MAX_SIDE || size.z > Self::MAX_SIDE {
             return Err(PreviewError::TooLarge);
         }
-        let mut mesh = PreviewMesh::new(size, vec![Arc::new(BlockTexture::solid(Self::MISSING))]);
+        let missing = vec![Arc::new(BlockTexture::solid(Self::MISSING))];
+        let mut mesh = PreviewMesh::new(size, missing, self.max_quads);
         let looks = Self::looks(structure, pack, &mut mesh);
         let occlusion: Vec<Occlusion> = looks.iter().map(|look| look.occlusion).collect();
         let cells = structure.primary.as_slice();
         let (sx, sy, sz) = (size.x as usize, size.y as usize, size.z as usize);
-        let neighbour = |x: usize, y: usize, z: usize, face: BlockFace| -> Occlusion {
-            let [dx, dy, dz] = face.offset();
+        let neighbour = |x: usize, y: usize, z: usize, face: Face| -> Occlusion {
+            let [dx, dy, dz] = face.normal();
             let (nx, ny, nz) = (x as i64 + i64::from(dx), y as i64 + i64::from(dy), z as i64 + i64::from(dz));
             if nx < 0 || ny < 0 || nz < 0 || nx >= sx as i64 || ny >= sy as i64 || nz >= sz as i64 {
                 return Occlusion::None;
@@ -42,6 +57,9 @@ impl PreviewMesher {
         };
         for x in 0..sx {
             for y in 0..sy {
+                if self.stop.is_stopped() {
+                    return Err(PreviewError::Stopped);
+                }
                 for z in 0..sz {
                     let Some(&palette) = cells.get((x * sy + y) * sz + z) else {
                         continue;
@@ -49,12 +67,12 @@ impl PreviewMesher {
                     let Some(look) = looks.get(usize::from(palette)) else {
                         continue;
                     };
-                    if mesh.quads.len() + 12 > PreviewMesh::MAX_QUADS {
+                    if !mesh.has_room(Self::CELL_QUADS) {
                         mesh.truncated = true;
                         return Ok(mesh);
                     }
                     let cell = [x as i16 * 16, y as i16 * 16, z as i16 * 16];
-                    let hidden = |face: BlockFace| look.occlusion.hidden_by(neighbour(x, y, z, face));
+                    let hidden = |face: Face| look.occlusion.hidden_by(neighbour(x, y, z, face));
                     match look.shape {
                         BlockShape::Hidden => {}
                         BlockShape::Cube => {
@@ -90,12 +108,12 @@ impl PreviewMesher {
             // a log lying along X or Z shows its rings on the ends instead of the top and bottom
             match block.states.get("pillar_axis") {
                 Some(StateValue::Text(axis)) if axis == "x" => {
-                    keys.swap(BlockFace::Up.index(), BlockFace::East.index());
-                    keys.swap(BlockFace::Down.index(), BlockFace::West.index());
+                    keys.swap(Face::Up.index(), Face::East.index());
+                    keys.swap(Face::Down.index(), Face::West.index());
                 }
                 Some(StateValue::Text(axis)) if axis == "z" => {
-                    keys.swap(BlockFace::Up.index(), BlockFace::North.index());
-                    keys.swap(BlockFace::Down.index(), BlockFace::South.index());
+                    keys.swap(Face::Up.index(), Face::North.index());
+                    keys.swap(Face::Down.index(), Face::South.index());
                 }
                 _ => {}
             }
@@ -104,7 +122,7 @@ impl PreviewMesher {
                 let upper =
                     matches!(block.states.get("upper_block_bit"), Some(StateValue::Bool(true) | StateValue::Int(1)));
                 let has_halves = block.states.get("upper_block_bit").is_some();
-                let face = if has_halves && !upper { BlockFace::Down } else { BlockFace::Up };
+                let face = if has_halves && !upper { Face::Down } else { Face::Up };
                 let key = keys[face.index()].clone();
                 keys = std::array::from_fn(|_| key.clone());
             }
@@ -139,17 +157,17 @@ impl PreviewMesher {
         mesh: &mut PreviewMesh,
         cell: [i16; 3],
         upside_down: bool,
-        high_side: BlockFace,
+        high_side: Face,
         look: &BlockLook,
-        hidden: &impl Fn(BlockFace) -> bool,
+        hidden: &impl Fn(Face) -> bool,
     ) {
         let (slab_min, slab_max, step_y, inner) =
-            if upside_down { (8, 16, (0, 8), BlockFace::Up) } else { (0, 8, (8, 16), BlockFace::Down) };
+            if upside_down { (8, 16, (0, 8), Face::Up) } else { (0, 8, (8, 16), Face::Down) };
         Self::emit_box(mesh, cell, [0, slab_min, 0], [16, slab_max, 16], look, hidden, None);
         let (min, max) = match high_side {
-            BlockFace::West => ([0, step_y.0, 0], [8, step_y.1, 16]),
-            BlockFace::South => ([0, step_y.0, 8], [16, step_y.1, 16]),
-            BlockFace::North => ([0, step_y.0, 0], [16, step_y.1, 8]),
+            Face::West => ([0, step_y.0, 0], [8, step_y.1, 16]),
+            Face::South => ([0, step_y.0, 8], [16, step_y.1, 16]),
+            Face::North => ([0, step_y.0, 0], [16, step_y.1, 8]),
             _ => ([8, step_y.0, 0], [16, step_y.1, 16]),
         };
         Self::emit_box(mesh, cell, min, max, look, hidden, Some(inner));
@@ -162,52 +180,52 @@ impl PreviewMesher {
         min: [u8; 3],
         max: [u8; 3],
         look: &BlockLook,
-        hidden: &impl Fn(BlockFace) -> bool,
-        skip: Option<BlockFace>,
+        hidden: &impl Fn(Face) -> bool,
+        skip: Option<Face>,
     ) {
         let [x0, y0, z0] = min.map(i16::from);
         let [x1, y1, z1] = max.map(i16::from);
-        for face in BlockFace::ALL {
+        for face in Face::ALL {
             if skip == Some(face) {
                 continue;
             }
             let on_side = match face {
-                BlockFace::Up => y1 == 16,
-                BlockFace::Down => y0 == 0,
-                BlockFace::North => z0 == 0,
-                BlockFace::South => z1 == 16,
-                BlockFace::West => x0 == 0,
-                BlockFace::East => x1 == 16,
+                Face::Up => y1 == 16,
+                Face::Down => y0 == 0,
+                Face::North => z0 == 0,
+                Face::South => z1 == 16,
+                Face::West => x0 == 0,
+                Face::East => x1 == 16,
             };
             if on_side && hidden(face) {
                 continue;
             }
             // local corners, then the texture position of each from where it sits in the cell
             let local: [[i16; 3]; 4] = match face {
-                BlockFace::Up => [[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]],
-                BlockFace::Down => [[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]],
-                BlockFace::North => [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]],
-                BlockFace::South => [[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]],
-                BlockFace::West => [[x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0]],
-                BlockFace::East => [[x1, y0, z0], [x1, y0, z1], [x1, y1, z1], [x1, y1, z0]],
+                Face::Up => [[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]],
+                Face::Down => [[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]],
+                Face::North => [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]],
+                Face::South => [[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]],
+                Face::West => [[x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0]],
+                Face::East => [[x1, y0, z0], [x1, y0, z1], [x1, y1, z1], [x1, y1, z0]],
             };
             let uvs = local.map(|[x, y, z]| {
                 let (u, v) = match face {
-                    BlockFace::Up => (x, z),
-                    BlockFace::Down => (x, 16 - z),
-                    BlockFace::North => (16 - x, 16 - y),
-                    BlockFace::South => (x, 16 - y),
-                    BlockFace::West => (z, 16 - y),
-                    BlockFace::East => (16 - z, 16 - y),
+                    Face::Up => (x, z),
+                    Face::Down => (x, 16 - z),
+                    Face::North => (16 - x, 16 - y),
+                    Face::South => (x, 16 - y),
+                    Face::West => (z, 16 - y),
+                    Face::East => (16 - z, 16 - y),
                 };
                 [u as u8, v as u8]
             });
-            let [nx, ny, nz] = face.offset();
-            mesh.quads.push(PreviewQuad {
+            let [nx, ny, nz] = face.normal();
+            mesh.push(PreviewQuad {
                 corners: local.map(|[x, y, z]| [cell[0] + x, cell[1] + y, cell[2] + z]),
                 uvs,
                 texture: look.textures[face.index()],
-                shade: face.shade(),
+                shade: PreviewShade::of(face),
                 normal: [nx as i8, ny as i8, nz as i8],
             });
         }
@@ -218,10 +236,10 @@ impl PreviewMesher {
         let planes: [[[i16; 3]; 4]; 2] =
             [[[0, 0, 0], [16, 0, 16], [16, 16, 16], [0, 16, 0]], [[16, 0, 0], [0, 0, 16], [0, 16, 16], [16, 16, 0]]];
         for plane in planes {
-            mesh.quads.push(PreviewQuad {
+            mesh.push(PreviewQuad {
                 corners: plane.map(|[x, y, z]| [cell[0] + x, cell[1] + y, cell[2] + z]),
                 uvs,
-                texture: look.textures[BlockFace::Up.index()],
+                texture: look.textures[Face::Up.index()],
                 shade: Self::CROSS_SHADE,
                 normal: [0, 0, 0],
             });

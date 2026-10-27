@@ -1,4 +1,5 @@
-use stratum_core::structs::easy_place::{Face, Placement, UseCommand};
+use stratum_core::structs::block::Face;
+use stratum_core::structs::easy_place::{Placement, UseCommand};
 use stratum_ffi::types::StUseCommand;
 
 fn placement() -> Placement {

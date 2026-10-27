@@ -6,4 +6,6 @@ pub enum PreviewError {
     Structure(#[from] StructureError),
     #[error("structure is too large for the preview")]
     TooLarge,
+    #[error("preview stopped before it finished")]
+    Stopped,
 }

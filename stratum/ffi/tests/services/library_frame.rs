@@ -126,7 +126,7 @@ fn action_queue_full_drops_and_logs() {
 
 #[test]
 fn frame_draws_only_on_the_overlay_while_open() {
-    let shared = SharedUi::new_shared();
+    let shared = SharedUi::new_shared(None);
     let mut pass = FramePass::new(Arc::clone(&shared));
 
     let closed = pass.run(LayerKind::Overlay, Vec::new());
@@ -141,7 +141,7 @@ fn frame_draws_only_on_the_overlay_while_open() {
 
 #[test]
 fn escape_closes_the_library_when_no_dialog_is_open() {
-    let shared = SharedUi::new_shared();
+    let shared = SharedUi::new_shared(None);
     let mut pass = FramePass::new(Arc::clone(&shared));
     shared.open();
     pass.run(LayerKind::Overlay, Vec::new());
@@ -154,7 +154,7 @@ fn escape_closes_the_library_when_no_dialog_is_open() {
 
 #[test]
 fn an_open_dialog_takes_escape_and_the_library_stays_shown() {
-    let shared = SharedUi::new_shared();
+    let shared = SharedUi::new_shared(None);
     let mut pass = FramePass::new(Arc::clone(&shared));
     shared.open();
     pass.run(LayerKind::Overlay, Vec::new());
@@ -173,7 +173,7 @@ fn an_open_dialog_takes_escape_and_the_library_stays_shown() {
 
 #[test]
 fn a_library_closed_by_escape_draws_again_when_reopened() {
-    let shared = SharedUi::new_shared();
+    let shared = SharedUi::new_shared(None);
     let mut pass = FramePass::new(Arc::clone(&shared));
     shared.open();
     pass.run(LayerKind::Overlay, Vec::new());
@@ -207,7 +207,7 @@ impl PickedLibrary {
             block_count: 100,
             project: Some(ProjectId(7)),
             grid_cell: None,
-            has_origin: false,
+            origin: None,
             file_name: String::new(),
         };
         let mut pick = ImportPick::new(1, Some(ProjectId(7)));
@@ -228,7 +228,7 @@ impl PickedLibrary {
 
 #[test]
 fn a_pick_seen_once_does_not_move_the_page_or_flash_on_a_later_open() {
-    let shared = SharedUi::new_shared();
+    let shared = SharedUi::new_shared(None);
     let mut pass = FramePass::new(Arc::clone(&shared));
     shared.publish(Arc::new(PickedLibrary::snapshot()));
     shared.open();

@@ -50,6 +50,7 @@ impl HandleState {
     pub fn tick(&mut self, status: &FrameStatus) {
         self.session.sync(status, self.controller.picker_busy());
         if let Some(config) = self.session.take_changed_config() {
+            self.shared.reconfigure_preview(&config.preview);
             self.controller.set_ghost_config(config.ghost);
         }
         for _ in 0..SharedUi::ACTION_CAPACITY {

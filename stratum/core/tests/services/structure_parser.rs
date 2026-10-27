@@ -363,3 +363,16 @@ fn accepts_256_x_384_x_256_fully_waterlogged_as_int_arrays() {
     assert_eq!(structure.secondary.len(), 25_165_824);
     assert_eq!(structure.block_count(), 25_165_824);
 }
+
+#[test]
+fn a_parse_stops_when_asked_and_reads_the_whole_file_when_not() {
+    let bytes = StructureFixture::full([64, 64, 64]).bytes();
+    let asks = std::cell::Cell::new(0u32);
+    let stopped = StructureParser::parse_until(&bytes, || {
+        asks.set(asks.get() + 1);
+        asks.get() > 2
+    });
+    // 64^3 cells give four checks per layer, so the third check comes inside the first layer
+    assert_eq!(stopped, Err(StructureError::Stopped));
+    assert!(StructureParser::parse_until(&bytes, || false).is_ok());
+}

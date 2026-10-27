@@ -26,15 +26,11 @@ pub struct DetailView {
 }
 
 impl DetailView {
-    pub fn new() -> Self {
-        Self { project_page: ProjectPage::new(), structure_page: StructurePage::new(), preview: None }
-    }
-
-    pub fn with_preview(service: Arc<PreviewService>) -> Self {
+    pub fn new(preview: Option<Arc<PreviewService>>) -> Self {
         Self {
             project_page: ProjectPage::new(),
             structure_page: StructurePage::new(),
-            preview: Some(StructurePreview::new(service)),
+            preview: preview.map(StructurePreview::new),
         }
     }
 
@@ -87,7 +83,7 @@ impl DetailView {
                     self.structure_page.show(ui, snapshot, row, state, out, self.preview.as_mut());
                 }
             }
-            Page::All | Page::Unsorted => StructureListPage::show(ui, snapshot, state.page, state),
+            Page::All | Page::Unsorted => StructureListPage::show(ui, snapshot, state.page, state, out),
         }
         // leaving a materials tab lets the next visit ask for its list again
         if state.materials_scope().is_none() {
@@ -96,11 +92,5 @@ impl DetailView {
             state.materials_reading = None;
             state.materials_failed = None;
         }
-    }
-}
-
-impl Default for DetailView {
-    fn default() -> Self {
-        Self::new()
     }
 }

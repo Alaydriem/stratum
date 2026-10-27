@@ -73,8 +73,8 @@ pub struct GhostScheduler {
 
 impl GhostScheduler {
     // About 870 filled cells at about 300 bytes of mesh each. A key holds up to 2 x cells_per_frame
-    // cells, or a half up to 2,048, and the target build averages about 700 per key; spike round 8
-    // measured about 192 GPU bytes per cell. At the default 1024 MiB this gives 4,096 slots. The
+    // cells, or a half up to 2,048, and the target build averages about 700 per key; the GPU cost
+    // measured about 192 bytes per cell. At the default 1024 MiB this gives 4,096 slots. The
     // reported bytes, not this estimate, keep the meshes inside the budget.
     pub const SLOT_BYTES_ESTIMATE: u64 = 256 * 1024;
 

@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use stratum_core::config::EasyPlaceConfig;
 use stratum_core::services::{EasyPlaceService, GhostAssembler, ItemRules, PlaceNeeds};
+use stratum_core::structs::block::Face;
 use stratum_core::structs::easy_place::{
-    EasyPlaceNotice, Face, GameMode, InventorySlot, PlaceNeed, Placement, SpotWorld, SwapAnswer, UseCommand, UseHit,
-    UseProbe,
+    EasyPlaceNotice, GameMode, InventorySlot, PlaceNeed, Placement, SpotWorld, SwapAnswer, UseCommand, UseHit, UseProbe,
 };
 use stratum_core::structs::ghost::{GhostBuild, GhostView, PlacedStructure};
 use stratum_core::structs::marker::Rotation;

@@ -1,7 +1,8 @@
 use crate::config::EasyPlaceConfig;
 use crate::services::{GhostRay, PlaceNeeds};
+use crate::structs::block::Face;
 use crate::structs::easy_place::{
-    Aim, AimKind, EasyPlaceNotice, EasyPlaceTelemetry, Face, FaceRule, GameMode, Half, HoldState, InventorySlot,
+    Aim, AimKind, EasyPlaceNotice, EasyPlaceTelemetry, FaceRule, GameMode, Half, HoldState, InventorySlot,
     PendingPlace, PendingSet, PlaceNeed, Placement, RayLimits, SpotWorld, SwapAnswer, TriedSet, UseCommand, UseProbe,
 };
 use crate::structs::ghost::{GhostBuild, GhostView};

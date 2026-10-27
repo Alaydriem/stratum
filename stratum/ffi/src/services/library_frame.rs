@@ -44,10 +44,7 @@ impl LibraryFrame {
     }
 
     fn new_view(shared: &SharedUi) -> LibraryView {
-        match shared.preview() {
-            Some(preview) => LibraryView::with_preview(Arc::clone(preview)),
-            None => LibraryView::new(),
-        }
+        LibraryView::new(shared.preview().cloned())
     }
 
     fn nothing() -> FrameReply {

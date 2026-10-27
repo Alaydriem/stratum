@@ -1,4 +1,4 @@
-use super::Face;
+use crate::structs::block::Face;
 
 // Place against `neighbour` on its `face`, the face that points at `spot`.
 #[derive(Debug, Clone, Copy, PartialEq)]

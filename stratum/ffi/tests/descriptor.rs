@@ -2,7 +2,7 @@ use amm_core::services::DescriptorChecker;
 use amm_core::services::settings::SchemaChecker;
 use amm_core::structs::descriptor::{ApplyMode, Capability, Chord, ClaimMode, KeyScope};
 use amm_core::structs::settings::HclDocument;
-use stratum_core::config::StratumConfig;
+use stratum_core::config::{PreviewConfig, StratumConfig};
 use stratum_ffi::services::ManagerSession;
 
 const DESCRIPTOR: &str = include_str!("../descriptor.hcl");
@@ -98,7 +98,7 @@ fn descriptor_passes_the_manager_checker() {
             ),
             ("library", vec!["library.max_structures", "library.max_projects", "markers.max_per_world"]),
             ("import", vec!["import.max_file_mb", "import.inbox_poll_seconds"]),
-            ("memory", vec!["cache.budget_mb"]),
+            ("memory", vec!["cache.budget_mb", "preview.texture_cache", "preview.max_quads"]),
             ("ghost", vec!["ghost.miniature", "ghost.draw_distance", "ghost.mesh_budget_mb", "ghost.cells_per_frame"]),
             ("debug", vec!["debug.telemetry"]),
         ]
@@ -125,7 +125,7 @@ fn open_library_is_keybind_index_0() {
 }
 
 #[test]
-fn only_the_key_telemetry_and_ghost_settings_apply_live() {
+fn only_the_key_telemetry_preview_and_ghost_settings_apply_live() {
     let descriptor = Checker::manager().parse(DESCRIPTOR).expect("the descriptor parses and checks");
 
     let live: Vec<_> = descriptor
@@ -145,6 +145,8 @@ fn only_the_key_telemetry_and_ghost_settings_apply_live() {
             ("keys.hud_left", ApplyMode::Live),
             ("keys.hud_right", ApplyMode::Live),
             ("keys.hud_mode", ApplyMode::Live),
+            ("preview.texture_cache", ApplyMode::Live),
+            ("preview.max_quads", ApplyMode::Live),
             ("ghost.miniature", ApplyMode::Live),
             ("ghost.draw_distance", ApplyMode::Live),
             ("ghost.cells_per_frame", ApplyMode::Live),
@@ -183,4 +185,17 @@ fn hud_keybinds_are_the_session_indexes_and_share_no_chord() {
             assert_ne!(keybind.default_chord, other.default_chord, "{} and {}", keybind.action, other.action);
         }
     }
+}
+
+#[test]
+fn a_preview_bound_in_the_config_file_is_kept_and_held_to_its_range() {
+    let descriptor = Checker::manager().parse(DESCRIPTOR).expect("the descriptor parses and checks");
+    let text = "preview {\n  texture_cache = 64\n  max_quads = 9000000\n}\n";
+    let document = HclDocument::new(text).expect("the document parses");
+
+    let checked = SchemaChecker::check(&descriptor.settings, document);
+    let config: StratumConfig = hcl::from_str(&checked.document.text()).expect("the checked document parses");
+
+    assert_eq!(config.preview.texture_cache, 64);
+    assert_eq!(config.preview.max_quads, PreviewConfig::MAX_MAX_QUADS);
 }

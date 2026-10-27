@@ -1,12 +1,41 @@
 use std::path::Path;
 
-use stratum_core::services::preview::BrArchive;
+use stratum_core::config::PreviewConfig;
+use stratum_core::services::preview::{BrArchive, PreviewMesher, TexturePack};
+use stratum_core::structs::preview::{PreviewMesh, PreviewStop};
 use stratum_core::structs::structure::{BlockLayer, BlockState, SparseLayer, Structure, StructureSize};
 
 // Builds structures, texture archives, TGA files and resource pack folders for the preview tests.
 pub struct PreviewFixture;
 
 impl PreviewFixture {
+    // A structure of `size` with `block` in every cell, built without a per-cell list.
+    pub fn solid(size: [u32; 3], block: BlockState) -> Structure {
+        let cells = vec![0u16; (size[0] * size[1] * size[2]) as usize];
+        Structure {
+            size: StructureSize::new(size[0], size[1], size[2]),
+            world_origin: None,
+            palette: vec![block],
+            primary: BlockLayer::new(cells),
+            secondary: SparseLayer::default(),
+        }
+    }
+
+    // A mesher with the default bounds and a stop nobody sets.
+    pub fn mesher() -> PreviewMesher {
+        PreviewMesher::new(PreviewConfig::default().max_quads(), PreviewStop::new())
+    }
+
+    // A pack with no textures and the default cache bound.
+    pub fn no_textures() -> TexturePack {
+        TexturePack::empty(PreviewConfig::default().texture_cache())
+    }
+
+    // The mesh of `structure` with the default bounds and no textures.
+    pub fn mesh(structure: &Structure) -> PreviewMesh {
+        Self::mesher().build(structure, &mut Self::no_textures()).unwrap()
+    }
+
     // A structure of the given size with each listed block in its cell; every other cell holds no block.
     pub fn structure(size: [u32; 3], blocks: &[([u32; 3], BlockState)]) -> Structure {
         let mut palette: Vec<BlockState> = Vec::new();

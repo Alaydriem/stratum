@@ -2,9 +2,7 @@ use egui::Context;
 use stratum_core::structs::action::LibraryAction;
 use stratum_core::structs::snapshot::LibrarySnapshot;
 
-use crate::views::dialogs::{
-    AssignDialog, DeleteDialog, DialogOutcome, MoveDialog, NewProjectDialog, PlaceMarkerDialog, RenameDialog,
-};
+use crate::views::dialogs::{AssignDialog, DeleteDialog, DialogOutcome, MoveDialog, NewProjectDialog, RenameDialog};
 
 // The one question or form the menu has open.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -13,7 +11,6 @@ pub enum Dialog {
     Rename(RenameDialog),
     Move(MoveDialog),
     Delete(DeleteDialog),
-    PlaceMarker(PlaceMarkerDialog),
     Assign(AssignDialog),
 }
 
@@ -25,7 +22,6 @@ impl Dialog {
             Self::Rename(dialog) => dialog.show(ctx, snapshot, out),
             Self::Move(dialog) => dialog.show(ctx, snapshot, out),
             Self::Delete(dialog) => dialog.show(ctx, snapshot, out),
-            Self::PlaceMarker(dialog) => dialog.show(ctx, snapshot, out),
             Self::Assign(dialog) => dialog.show(ctx, snapshot, out),
         }
     }

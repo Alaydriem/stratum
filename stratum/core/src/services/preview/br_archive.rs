@@ -1,4 +1,4 @@
-use super::BrEntry;
+use crate::structs::preview::BrEntry;
 
 // Reads the index of a game `.brarchive` file. The layout: an 8 byte magic, a u32 entry count and a u32 version,
 // then one 256 byte record per entry (a u8 name length, the name padded to 247 bytes, a u32 offset and a u32

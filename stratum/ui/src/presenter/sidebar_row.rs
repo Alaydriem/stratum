@@ -21,7 +21,8 @@ pub enum SidebarRow {
         target: MarkerTarget,
         // The name of what the marker shows; empty when it is missing.
         target_name: String,
-        distance: i32,
+        // The marker's block, x y z.
+        origin: [i32; 3],
         active: bool,
         missing: bool,
     },

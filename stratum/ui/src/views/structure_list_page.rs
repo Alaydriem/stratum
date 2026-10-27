@@ -2,6 +2,8 @@ use egui::{Align, Id, ScrollArea, Ui};
 use levi_i18n::text::{Args, Text, UserText};
 use levi_ui::icon::Icon;
 use levi_ui::widget::{Avatar, AvatarSize, EmptyState, ListRow, ListRowResponse, ScrollBar};
+use stratum_core::structs::action::LibraryAction;
+use stratum_core::structs::marker::MarkerTarget;
 use stratum_core::structs::snapshot::{LibrarySnapshot, StructureRow};
 
 use super::{MarkerActions, PageTitle, StratumId};
@@ -14,7 +16,13 @@ use crate::state::{LibraryUiState, Page};
 pub struct StructureListPage;
 
 impl StructureListPage {
-    pub fn show(ui: &mut Ui, snapshot: &LibrarySnapshot, page: Page, state: &mut LibraryUiState) {
+    pub fn show(
+        ui: &mut Ui,
+        snapshot: &LibrarySnapshot,
+        page: Page,
+        state: &mut LibraryUiState,
+        out: &mut Vec<LibraryAction>,
+    ) {
         let rows = Self::rows(snapshot, page);
         let (title, count) = match page {
             Page::Unsorted => (StratumMessage::Unsorted, snapshot.unsorted.len()),
@@ -47,7 +55,7 @@ impl StructureListPage {
                     response.row.scroll_to_me(Some(Align::Center));
                 }
                 if response.action {
-                    MarkerActions::open_place(state, row.id);
+                    out.extend(MarkerActions::place(snapshot, MarkerTarget::Structure(row.id)));
                 } else if response.row.clicked() {
                     state.page = Page::Structure(row.id);
                 }
@@ -81,7 +89,7 @@ impl StructureListPage {
         ListRow::new(Avatar::new(&name, AvatarSize::Regular), Text::user(name))
             .subtitle(Text::format(StratumMessage::StructureSubtitle, size))
             .flash(flash)
-            .action(MarkerActions::row_action(snapshot))
+            .action(MarkerActions::row_action(snapshot, MarkerTarget::Structure(row.id)))
             .show(ui)
     }
 }

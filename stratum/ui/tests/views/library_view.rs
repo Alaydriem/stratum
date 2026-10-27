@@ -30,8 +30,8 @@ impl SwitchSnapshot {
     fn build() -> LibrarySnapshot {
         let mut snapshot = SnapshotFixture::library();
         snapshot.markers = vec![
-            SnapshotFixture::marker(1, "East wing", 12, true, TargetState::Ok),
-            SnapshotFixture::marker(7, "Hall test", 31, false, TargetState::Ok),
+            SnapshotFixture::marker(1, "East wing", [12, 64, -340], true, TargetState::Ok),
+            SnapshotFixture::marker(7, "Hall test", [31, 64, -340], false, TargetState::Ok),
         ];
         snapshot
     }

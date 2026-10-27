@@ -1,4 +1,5 @@
-use crate::structs::preview::{BlockFace, BlockShape, Occlusion};
+use crate::structs::block::Face;
+use crate::structs::preview::{BlockShape, Occlusion};
 use crate::structs::structure::{BlockState, StateValue};
 
 // Picks the preview shape of a block from its name and states. The game hard-codes these shapes; the preview
@@ -81,10 +82,10 @@ impl ShapeRules {
         }
         if name.ends_with("_stairs") {
             let high_side = match block.states.get("weirdo_direction") {
-                Some(StateValue::Int(1)) => BlockFace::West,
-                Some(StateValue::Int(2)) => BlockFace::South,
-                Some(StateValue::Int(3)) => BlockFace::North,
-                _ => BlockFace::East,
+                Some(StateValue::Int(1)) => Face::West,
+                Some(StateValue::Int(2)) => Face::South,
+                Some(StateValue::Int(3)) => Face::North,
+                _ => Face::East,
             };
             return (
                 BlockShape::Stairs { upside_down: Self::flag(block, "upside_down_bit"), high_side },

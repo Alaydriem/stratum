@@ -1,8 +1,7 @@
-use crate::structs::preview::OrbitCamera;
-use crate::structs::structure::StructureSize;
+use super::{OrbitCamera, PreviewBounds};
 
-// A perspective camera that looks at the centre of a structure from the orbit camera's turn, far enough away that
-// the structure's bounding sphere fits the shorter side of the image.
+// A perspective camera that looks at the centre of a box from the orbit camera's turn, far enough away that the
+// box's bounding sphere fits the shorter side of the image. The box is the drawn blocks of the mesh.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PreviewProjection {
     eye: [f32; 3],
@@ -21,18 +20,19 @@ impl PreviewProjection {
     // The share of the half image the structure reaches from the start view.
     pub const FILL: f32 = 0.92;
 
-    // The structure fills `FILL` of the image from the start view; the same zoom is kept for every other turn, so
-    // the size does not change while the camera orbits. The zoom never lets the bounding sphere outgrow the longer
-    // side of the image. The camera's zoom then scales that fitted view about the image centre.
-    pub fn new(size: StructureSize, camera: OrbitCamera, width: u32, height: u32) -> Self {
-        let start = Self::build(size, OrbitCamera::start(), width, height, 1.0);
+    // The box fills `FILL` of the image from the start view; the same zoom is kept for every other turn, so the
+    // size does not change while the camera orbits. The zoom never lets the bounding sphere outgrow the longer side
+    // of the image. The camera's zoom then scales that fitted view about the image centre.
+    pub fn new(bounds: PreviewBounds, camera: OrbitCamera, width: u32, height: u32) -> Self {
+        let start = Self::build(bounds, OrbitCamera::start(), width, height, 1.0);
         let (half_w, half_h) = (width.max(1) as f32 / 2.0, height.max(1) as f32 / 2.0);
+        let (low, high) = (bounds.low(), bounds.high());
         let mut reach: f32 = 0.0;
         for corner in 0..8u32 {
             let point = [
-                if corner & 1 == 0 { 0.0 } else { size.x as f32 },
-                if corner & 2 == 0 { 0.0 } else { size.y as f32 },
-                if corner & 4 == 0 { 0.0 } else { size.z as f32 },
+                if corner & 1 == 0 { low[0] } else { high[0] },
+                if corner & 2 == 0 { low[1] } else { high[1] },
+                if corner & 4 == 0 { low[2] } else { high[2] },
             ];
             let [x, y, inverse] = start.project(point);
             if inverse > 0.0 {
@@ -41,12 +41,13 @@ impl PreviewProjection {
         }
         let longest = half_w.max(half_h) / half_w.min(half_h);
         let fit = if reach > 0.0 { (Self::FILL / reach).clamp(1.0, longest) } else { 1.0 };
-        Self::build(size, camera, width, height, fit * camera.zoom)
+        Self::build(bounds, camera, width, height, fit * camera.zoom)
     }
 
-    fn build(size: StructureSize, camera: OrbitCamera, width: u32, height: u32, zoom: f32) -> Self {
-        let extent = [size.x as f32, size.y as f32, size.z as f32];
-        let target = extent.map(|side| side / 2.0);
+    fn build(bounds: PreviewBounds, camera: OrbitCamera, width: u32, height: u32, zoom: f32) -> Self {
+        let (low, high) = (bounds.low(), bounds.high());
+        let extent = [high[0] - low[0], high[1] - low[1], high[2] - low[2]];
+        let target = [low[0] + extent[0] / 2.0, low[1] + extent[1] / 2.0, low[2] + extent[2] / 2.0];
         let radius = (extent[0] * extent[0] + extent[1] * extent[1] + extent[2] * extent[2]).sqrt().max(1.0) / 2.0;
         let half_fov = (Self::FOV_DEGREES / 2.0).to_radians();
         let distance = radius / half_fov.sin();

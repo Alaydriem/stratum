@@ -1,4 +1,4 @@
-use stratum_core::structs::easy_place::{Face, Placement, UseCommand};
+use stratum_core::structs::easy_place::{Placement, UseCommand};
 
 // What the shim does with the use call. `kind` is 0 vanilla (let the game handle the use), 1 block (cancel the
 // use, do nothing else), 2 select (change to `slot`, then place), 3 swap (exchange the stacks in `from` and
@@ -39,12 +39,11 @@ impl StUseCommand {
     }
 
     fn placed(kind: u8, slot: u8, placement: Placement) -> Self {
-        let face = Face::ALL.iter().position(|candidate| *candidate == placement.face).unwrap_or(0);
         Self {
             slot,
             spot: placement.spot,
             neighbour: placement.neighbour,
-            face: face as u8,
+            face: placement.face.index() as u8,
             click: placement.click,
             ..Self::of(kind)
         }

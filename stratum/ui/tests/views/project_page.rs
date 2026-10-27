@@ -6,7 +6,7 @@ use stratum_core::structs::library::{ProjectId, ProjectKind, StructureId};
 use stratum_core::structs::marker::MarkerTarget;
 use stratum_core::structs::snapshot::LibrarySnapshot;
 use stratum_core::structs::structure::StructureSize;
-use stratum_ui::state::{Dialog, Page};
+use stratum_ui::state::Page;
 
 use crate::support::{RowSpots, ShapeProbe, SnapshotFixture, ViewSession};
 
@@ -278,8 +278,7 @@ fn the_card_falls_back_to_the_first_structure_when_the_selected_one_is_gone() {
 #[test]
 fn the_card_lists_no_name_row() {
     let session = Pair::session();
-    assert!(ShapeProbe::text_rect(&session.shapes, "STRUCTURE FACTS").is_some());
-    assert!(ShapeProbe::text_rect(&session.shapes, "Saved origin").is_some());
+    assert!(Pair::in_card(&session, "no saved origin").is_some());
     assert!(ShapeProbe::exact_rects(&session.shapes, "Name").is_empty());
 }
 
@@ -290,10 +289,9 @@ fn the_card_footer_acts_on_the_selected_structure() {
     session.click(spot);
     let place = Pair::in_card(&session, "Place marker here").expect("footer is painted").center();
     session.click(place);
-    let Some(Dialog::PlaceMarker(dialog)) = &session.state.dialog else {
-        panic!("the place marker dialog is open");
-    };
-    assert_eq!(dialog.target(), MarkerTarget::Structure(StructureId(2)));
+    let target = MarkerTarget::Structure(StructureId(2));
+    assert_eq!(session.actions, [LibraryAction::PlaceMarker { name: "East tower".to_owned(), target }]);
+    assert_eq!(session.state.dialog, None, "no dialog opens");
 }
 
 #[test]
@@ -331,24 +329,24 @@ fn the_size_box_names_the_three_lengths_of_the_selected_structure() {
         ShapeProbe::exact_rects(&session.shapes, text).into_iter().filter(|rect| card.contains_rect(*rect)).count()
     };
     assert_eq!(in_card("9"), 2, "the X and Z lengths are painted in the card");
-    // the Y length, and the Layers fact that shows the same figure
-    assert_eq!(in_card("41"), 2);
+    assert_eq!(in_card("41"), 1, "the Y length is painted in the card");
+    assert_eq!(in_card("41 layers"), 1, "the facts line names the layers");
 }
 
 #[test]
 fn normal_project_rows_have_a_place_action() {
     let mut session = Pair::session();
     session.snapshot.in_world = true;
+    session.snapshot.has_player = true;
     session.frame(Vec::new());
     // the second row is not the selected one, so it paints a hover fill
     let spot = RowSpots::structure_action(&mut session, "East tower").expect("row is hovered");
     let slot = Rect::from_center_size(spot, vec2(28.0, 28.0));
     assert!(ShapeProbe::count_inside(&session.shapes, slot) > 0, "the button is painted");
     session.click(spot);
-    let Some(Dialog::PlaceMarker(dialog)) = &session.state.dialog else {
-        panic!("the place marker dialog is open");
-    };
-    assert_eq!(dialog.target(), MarkerTarget::Structure(StructureId(2)));
+    let target = MarkerTarget::Structure(StructureId(2));
+    assert_eq!(session.actions, [LibraryAction::PlaceMarker { name: "East tower".to_owned(), target }]);
+    assert_eq!(session.state.dialog, None, "no dialog opens");
     assert_eq!(session.state.selected_structure, Some(StructureId(1)), "the action does not select the row");
 }
 
@@ -471,10 +469,10 @@ fn a_card_taller_than_the_room_keeps_its_footer_under_the_facts() {
 #[test]
 fn a_scroll_offset_does_not_outlive_the_content_that_needed_it() {
     let mut session = Short::session();
-    let before = ShapeProbe::text_rect(&session.shapes, "STRUCTURE FACTS").expect("header is painted").top();
+    let before = ShapeProbe::text_rect(&session.shapes, "no saved origin").expect("facts are painted").top();
     let card = Pair::card(&session);
     session.scroll(card.min + vec2(40.0, 40.0), vec2(0.0, -400.0));
-    let scrolled = ShapeProbe::text_rect(&session.shapes, "STRUCTURE FACTS").expect("header is painted").top();
+    let scrolled = ShapeProbe::text_rect(&session.shapes, "no saved origin").expect("facts are painted").top();
     assert!(scrolled < before - 50.0, "the card scrolled from {before} to {scrolled}");
 
     session.resize(vec2(1920.0, 1080.0));
@@ -482,7 +480,7 @@ fn a_scroll_offset_does_not_outlive_the_content_that_needed_it() {
         session.frame(Vec::new());
     }
     let card = Pair::card(&session);
-    let header = Pair::in_card(&session, "STRUCTURE FACTS").expect("header is painted in the card");
+    let header = Pair::in_card(&session, "no saved origin").expect("facts are painted in the card");
     assert!(header.top() - card.top() < 260.0, "the card is still scrolled: header {header:?}, card {card:?}");
     let footer = Pair::in_card(&session, "Place marker here").expect("footer is painted");
     let button_bottom = footer.center().y + <spacing::Button as SpacingToken>::VALUE / 2.0;
@@ -504,7 +502,7 @@ fn the_structure_page_card_keeps_its_footer_inside_the_panel_on_a_short_screen()
             .max_by(|a, b| a.min.x.total_cmp(&b.min.x))
             .expect("footer is painted")
     };
-    let over_card = ShapeProbe::text_centre(&session.shapes, "STRUCTURE FACTS").expect("header is painted");
+    let over_card = ShapeProbe::text_centre(&session.shapes, "no saved origin").expect("facts are painted");
     session.scroll(over_card, vec2(0.0, -600.0));
     let footer = footer_of(&session);
     assert!(footer.bottom() <= panel.bottom(), "the footer {footer:?} is outside the panel {panel:?}");

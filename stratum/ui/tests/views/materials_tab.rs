@@ -218,7 +218,7 @@ fn structure_facts_show_the_values() {
     session.state.page = Page::Structure(StructureId(1));
     session.frame(Vec::new());
     session.frame(Vec::new());
-    for text in ["Preview", "STRUCTURE FACTS", "32 × 18 × 24", "4,212", "No saved position"] {
+    for text in ["Preview", "32 × 18 × 24", "18 layers", "4,212 blocks", "no saved origin"] {
         assert!(ShapeProbe::text_rect(&session.shapes, text).is_some(), "{text} is not painted");
     }
 }

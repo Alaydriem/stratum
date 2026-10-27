@@ -1,9 +1,9 @@
-use super::PreviewProjection;
-use crate::structs::preview::{BlockTexture, OrbitCamera, PreviewMesh};
+use crate::structs::preview::{BlockTexture, OrbitCamera, PreviewMesh, PreviewProjection, PreviewStop};
 
 // Draws a preview mesh into an RGBA image on the CPU: perspective correct texture lookup, nearest texel, a depth
 // buffer, and texels under half alpha left out (the game's alpha test for leaves and plants). The colour and depth
-// buffers are kept between renders and only grow when the image grows.
+// buffers are kept between renders and only grow when the image grows; `swap_pixels` hands the colour buffer out
+// and takes a spare in its place, so a picture leaves without a copy. The stop is checked every `STOP_EVERY` quads.
 // Bound: the buffers hold one image of at most `MAX_WIDTH * MAX_HEIGHT` pixels.
 pub struct PreviewRasterizer {
     width: usize,
@@ -11,19 +11,22 @@ pub struct PreviewRasterizer {
     colour: Vec<u8>,
     // 1 / depth per pixel; 0 is empty, larger is nearer.
     depth: Vec<f32>,
+    stop: PreviewStop,
 }
 
 impl PreviewRasterizer {
     pub const MAX_WIDTH: u32 = 640;
     pub const MAX_HEIGHT: u32 = 480;
     const ALPHA_CUT: u8 = 128;
+    const STOP_EVERY: usize = 256;
 
-    pub fn new() -> Self {
-        Self { width: 0, height: 0, colour: Vec::new(), depth: Vec::new() }
+    pub fn new(stop: PreviewStop) -> Self {
+        Self { width: 0, height: 0, colour: Vec::new(), depth: Vec::new(), stop }
     }
 
     // Draws `mesh` seen through `camera` at `width` by `height` pixels, each capped at its limit, and returns the
-    // triangles drawn. The picture is in `pixels`; empty pixels are transparent.
+    // triangles drawn. The picture is in `pixels`; empty pixels are transparent. A set stop ends the render early
+    // with the picture part drawn.
     pub fn render(&mut self, mesh: &PreviewMesh, camera: OrbitCamera, width: u32, height: u32) -> usize {
         let width = width.clamp(1, Self::MAX_WIDTH);
         let height = height.clamp(1, Self::MAX_HEIGHT);
@@ -34,10 +37,13 @@ impl PreviewRasterizer {
         self.colour.resize(pixels * 4, 0);
         self.depth.clear();
         self.depth.resize(pixels, 0.0);
-        let projection = PreviewProjection::new(mesh.size, camera, width, height);
+        let projection = PreviewProjection::new(mesh.view_bounds(), camera, width, height);
         let eye = projection.eye();
         let mut drawn = 0;
-        for quad in &mesh.quads {
+        for (index, quad) in mesh.quads().iter().enumerate() {
+            if index % Self::STOP_EVERY == 0 && self.stop.is_stopped() {
+                break;
+            }
             let world = quad.corners.map(|corner| corner.map(|axis| f32::from(axis) / 16.0));
             if quad.normal != [0, 0, 0] {
                 let [nx, ny, nz] = quad.normal.map(f32::from);
@@ -76,6 +82,12 @@ impl PreviewRasterizer {
     // The last picture: straight RGBA rows from the top.
     pub fn pixels(&self) -> &[u8] {
         &self.colour
+    }
+
+    // Gives out the last picture and keeps `spare` as the colour buffer of the next render, which reuses its
+    // capacity. A spare of the size of the picture makes the next render allocate nothing.
+    pub fn swap_pixels(&mut self, spare: Vec<u8>) -> Vec<u8> {
+        std::mem::replace(&mut self.colour, spare)
     }
 
     // Each vertex is screen x, screen y, 1 / depth, u / depth and v / depth. True when the triangle covered the
@@ -145,11 +157,5 @@ impl PreviewRasterizer {
             row2 += step2[1];
         }
         true
-    }
-}
-
-impl Default for PreviewRasterizer {
-    fn default() -> Self {
-        Self::new()
     }
 }

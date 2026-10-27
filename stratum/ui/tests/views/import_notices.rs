@@ -41,7 +41,9 @@ fn only_the_newest_notices_are_shown_newest_first() {
 fn many_missing_markers_share_one_banner() {
     let mut snapshot = SnapshotFixture::library();
     snapshot.markers = (1..=3)
-        .map(|number| SnapshotFixture::marker(number, &format!("Lost {number}"), 10, false, TargetState::Missing))
+        .map(|number| {
+            SnapshotFixture::marker(number, &format!("Lost {number}"), [10, 64, -340], false, TargetState::Missing)
+        })
         .collect();
     let session = ViewSession::new(snapshot);
     assert!(ShapeProbe::text_rect(&session.shapes, "3 markers have nothing to show").is_some());

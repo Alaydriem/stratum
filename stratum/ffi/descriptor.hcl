@@ -177,6 +177,22 @@ section "memory" {
     default = 128
     apply   = "Restart"
   }
+
+  field "preview.texture_cache" {
+    label   = "Preview textures"
+    help    = "Block textures the 3D preview keeps decoded"
+    kind    = { int = { min = 16, max = 8192, step = 16 } }
+    default = 1024
+    apply   = "Live"
+  }
+
+  field "preview.max_quads" {
+    label   = "Preview faces"
+    help    = "Most block faces one 3D preview draws; a bigger structure is cut"
+    kind    = { int = { min = 10000, max = 4000000, step = 10000 } }
+    default = 1000000
+    apply   = "Live"
+  }
 }
 
 section "ghost" {

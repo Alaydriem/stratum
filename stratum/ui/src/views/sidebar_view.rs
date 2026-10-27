@@ -126,7 +126,7 @@ impl SidebarView {
         ScrollBar::show(ui, area, false, |ui| {
             let mut shown = 0;
             for row in rows {
-                let SidebarRow::Marker { id, name, target, target_name, distance, active, missing } = row else {
+                let SidebarRow::Marker { id, name, target, target_name, origin, active, missing } = row else {
                     continue;
                 };
                 if !MarkerFilter::matches(name, target_name, &filter) {
@@ -134,7 +134,7 @@ impl SidebarView {
                 }
                 shown += 1;
                 let fields = ((*id, name.as_str(), *target), target_name.as_str());
-                Self::show_marker(ui, fields, (*distance, *active, *missing), (snapshot, state), out);
+                Self::show_marker(ui, fields, (*origin, *active, *missing), (snapshot, state), out);
             }
             if total == 0 {
                 Caption::new(Text::message(StratumMessage::NoMarkers)).show(ui);
@@ -147,7 +147,7 @@ impl SidebarView {
     fn show_marker(
         ui: &mut Ui,
         ((id, name, target), target_name): ((MarkerId, &str, MarkerTarget), &str),
-        (distance, active, missing): (i32, bool, bool),
+        (origin, active, missing): ([i32; 3], bool, bool),
         (snapshot, state): (&LibrarySnapshot, &mut LibraryUiState),
         out: &mut Vec<LibraryAction>,
     ) {
@@ -162,13 +162,14 @@ impl SidebarView {
             let target = Text::user(UserText::from_model(target_name.to_owned()));
             chips.push(Chip::new(ChipKind::Display(ChipTone::Neutral), target));
         }
-        let meters = Args::new().int("meters", i64::from(distance));
+        let position =
+            Args::new().int("x", i64::from(origin[0])).int("y", i64::from(origin[1])).int("z", i64::from(origin[2]));
         let mut on = active;
         let delete = IconButton::new(Icon::Delete)
             .tooltip(Text::message(StratumMessage::DeleteMarkerTooltip))
             .enabled(!snapshot.markers_read_only, DisabledReason::message(StratumMessage::MarkersReadOnlyReason));
         let mut row = ListRow::new(Avatar::new(&model, AvatarSize::Regular), Text::user(model))
-            .version(Text::format(StratumMessage::MarkerDistance, meters))
+            .version(Text::format(StratumMessage::MarkerPosition, position))
             .chips(chips)
             .selected(state.shows_target(target))
             .action(delete);

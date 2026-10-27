@@ -5,15 +5,17 @@ use std::sync::Arc;
 use serde_json::Value;
 
 use super::{BrArchive, JsonText, TextureDecoder};
-use crate::structs::preview::{BlockFace, BlockTexture, TextureTint};
+use crate::structs::block::Face;
+use crate::structs::preview::{BlockTexture, TextureTint};
 
 // The block textures of the installed game, read once from its resource packs. The game layers `vanilla` and every
 // `vanilla_<version>` pack in version order, a later pack replacing what an earlier one names; this does the same
 // for `blocks.json`, `textures/terrain_texture.json` and the block texture archives under `__brarchive`.
 // Bound: the archive bytes are what the packs hold (about 7 MB for the game version it was written against), and
-// at most `CACHE_CAPACITY` decoded textures are kept; a decode past that empties the cache first.
+// at most `capacity` decoded textures are kept (`PreviewConfig::texture_cache`); a decode past that empties the
+// cache first.
 pub struct TexturePack {
-    // Block name without the namespace, to the texture key of each face in `BlockFace` order.
+    // Block name without the namespace, to the texture key of each face in `Face` order.
     blocks: HashMap<String, [String; 6]>,
     // Texture key to the texture path (for example `textures/blocks/log_oak`) and whether it is an overlay texture.
     terrain: HashMap<String, (String, bool)>,
@@ -21,16 +23,17 @@ pub struct TexturePack {
     // Texture path without the extension to (archive, start, length, is TGA).
     files: HashMap<String, (usize, usize, usize, bool)>,
     cache: HashMap<String, Option<Arc<BlockTexture>>>,
+    capacity: usize,
     packs: usize,
 }
 
 impl TexturePack {
-    pub const CACHE_CAPACITY: usize = 1024;
     // Block names the packs do not list under their own name.
     const ALIASES: [(&'static str, &'static str); 1] = [("grass_block", "grass")];
 
-    // A pack with no textures: every block draws the grey stand-in.
-    pub fn empty() -> Self {
+    // A pack with no textures: every block draws the grey stand-in. It keeps at most `capacity` textures, at
+    // least one.
+    pub fn empty(capacity: usize) -> Self {
         Self {
             blocks: HashMap::new(),
             terrain: HashMap::new(),
@@ -38,14 +41,24 @@ impl TexturePack {
             files: HashMap::new(),
             cache: HashMap::new(),
             packs: 0,
+            capacity: capacity.max(1),
         }
     }
 
     // Reads the packs under `packs_dir`. A missing or broken file is skipped, so this never fails; a folder with
-    // no packs gives an empty pack.
-    pub fn load(packs_dir: &Path) -> Self {
-        let mut pack = Self::empty();
+    // no packs gives an empty pack. It keeps at most `capacity` decoded textures.
+    pub fn load(packs_dir: &Path, capacity: usize) -> Self {
+        Self::load_until(packs_dir, capacity, || false)
+    }
+
+    // Like `load`, giving back the packs read so far as soon as `stopped` returns true; it is asked before each
+    // pack and each texture archive.
+    pub fn load_until(packs_dir: &Path, capacity: usize, stopped: impl Fn() -> bool) -> Self {
+        let mut pack = Self::empty(capacity);
         for dir in Self::pack_dirs(packs_dir) {
+            if stopped() {
+                return pack;
+            }
             pack.packs += 1;
             pack.read_blocks(&dir.join("blocks.json"));
             pack.read_terrain(&dir.join("textures").join("terrain_texture.json"));
@@ -56,6 +69,9 @@ impl TexturePack {
                     listing.filter_map(|entry| entry.ok().map(|entry| entry.path())).collect();
                 nested.sort();
                 for path in nested {
+                    if stopped() {
+                        return pack;
+                    }
                     if path.extension().is_some_and(|ext| ext == "brarchive")
                         && let Some(stem) = path.file_stem().and_then(|stem| stem.to_str())
                     {
@@ -79,6 +95,14 @@ impl TexturePack {
 
     pub fn block_count(&self) -> usize {
         self.blocks.len()
+    }
+
+    // Changes the cache bound; a cache already past the new bound is emptied.
+    pub fn set_capacity(&mut self, capacity: usize) {
+        self.capacity = capacity.max(1);
+        if self.cache.len() > self.capacity {
+            self.cache.clear();
+        }
     }
 
     pub fn cached(&self) -> usize {
@@ -109,7 +133,7 @@ impl TexturePack {
             return found.clone();
         }
         let decoded = self.decode(key).map(Arc::new);
-        if self.cache.len() >= Self::CACHE_CAPACITY {
+        if self.cache.len() >= self.capacity {
             self.cache.clear();
         }
         self.cache.insert(key.to_owned(), decoded.clone());
@@ -120,7 +144,7 @@ impl TexturePack {
     pub fn insert(&mut self, block: &str, keys: [String; 6], textures: Vec<(String, BlockTexture)>) {
         self.blocks.insert(block.to_owned(), keys);
         for (key, texture) in textures {
-            if self.cache.len() >= Self::CACHE_CAPACITY {
+            if self.cache.len() >= self.capacity {
                 self.cache.clear();
             }
             self.cache.insert(key, Some(Arc::new(texture)));
@@ -183,16 +207,8 @@ impl TexturePack {
         let get = |key: &str| textures.get(key).and_then(Value::as_str);
         let side = get("side").or_else(|| get("north")).or_else(|| get("up"))?;
         let mut keys: [String; 6] = std::array::from_fn(|_| side.to_owned());
-        for face in BlockFace::ALL {
-            let name = match face {
-                BlockFace::Up => "up",
-                BlockFace::Down => "down",
-                BlockFace::North => "north",
-                BlockFace::South => "south",
-                BlockFace::West => "west",
-                BlockFace::East => "east",
-            };
-            if let (Some(key), Some(slot)) = (get(name), keys.get_mut(face.index())) {
+        for face in Face::ALL {
+            if let (Some(key), Some(slot)) = (get(face.json_key()), keys.get_mut(face.index())) {
                 *slot = key.to_owned();
             }
         }

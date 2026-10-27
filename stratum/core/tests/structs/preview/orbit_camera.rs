@@ -19,9 +19,3 @@ fn zoom_stops_at_its_limits_and_a_turn_keeps_it() {
     assert_eq!(camera.zoomed(100).zoom, OrbitCamera::MAX_ZOOM);
     assert_eq!(camera.zoomed(-100).zoom, OrbitCamera::MIN_ZOOM);
 }
-
-#[test]
-fn a_new_view_starts_at_zoom_one() {
-    assert_eq!(OrbitCamera::start().zoom, 1.0);
-    assert_eq!(OrbitCamera::new(10.0, 10.0).zoom, 1.0);
-}

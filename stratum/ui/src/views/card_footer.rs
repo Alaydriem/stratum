@@ -15,14 +15,18 @@ impl CardFooter {
     // `card_bottom` is the y of the card's outer bottom edge and `inset` the room `CardFooter::inset` gave. Call it
     // inside the card's frame, after the card's other content.
     pub fn show(ui: &mut Ui, card_bottom: f32, inset: f32, content: impl FnOnce(&mut Ui)) {
-        let height = <spacing::Button as SpacingToken>::VALUE;
         let gap = <spacing::L as SpacingToken>::VALUE;
         let least = <spacing::M as SpacingToken>::VALUE;
-        let divider = (card_bottom - inset - height - gap).max(ui.cursor().top() + least);
+        let divider = Self::divider(card_bottom, inset).max(ui.cursor().top() + least);
         let sides = ui.min_rect().x_range();
         let edge = sides.min - inset..=sides.max + inset;
         Draw::divider(ui.painter(), edge.into(), divider, <color::Line as ColorToken>::VALUE);
         ui.add_space(divider + gap - ui.cursor().top());
         content(ui);
+    }
+
+    // The y of the divider when the card's content leaves room for the footer at the card's bottom.
+    pub fn divider(card_bottom: f32, inset: f32) -> f32 {
+        card_bottom - inset - <spacing::Button as SpacingToken>::VALUE - <spacing::L as SpacingToken>::VALUE
     }
 }

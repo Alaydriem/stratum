@@ -18,4 +18,6 @@ pub enum StructureError {
     TooLarge { volume: u64 },
     #[error("structure file could not be read: {0}")]
     Unreadable(String),
+    #[error("structure read stopped before it finished")]
+    Stopped,
 }

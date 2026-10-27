@@ -9,7 +9,7 @@ pub struct MarkerRow {
     // The name of the structure or project the marker shows; empty when it is missing.
     pub target_name: String,
     pub state: TargetState,
-    // Blocks from the player's feet to the marker, rounded.
-    pub distance: i32,
+    // The block the marker stands on, x y z, as stored.
+    pub origin: [i32; 3],
     pub active: bool,
 }

@@ -103,10 +103,11 @@ fn place_marker_uses_player_feet() {
     Scene::import(&mut controller, data.path(), "tower", &Scene::stone());
     controller.tick(&Frames::at("W1", [10, 70, -20], 1.0));
     Scene::place(&mut controller, "Home");
-    assert_eq!(controller.snapshot().markers[0].distance, 0);
+    assert_eq!(controller.snapshot().markers[0].origin, [10, 70, -20]);
 
+    // the row gives the stored position, not one measured from the feet
     controller.tick(&Frames::at("W1", [13, 70, -16], 2.0));
-    assert_eq!(controller.snapshot().markers[0].distance, 5);
+    assert_eq!(controller.snapshot().markers[0].origin, [10, 70, -20]);
 
     controller.shutdown();
     let saved = MarkerStore::new(data.path().join("markers"))
@@ -173,12 +174,26 @@ fn a_world_with_no_key_yet_counts_as_no_world() {
 }
 
 #[test]
+fn the_snapshot_follows_whether_the_game_has_a_player() {
+    let data = tempfile::tempdir().unwrap();
+    let mut controller = ControllerHarness::start(data.path());
+    controller.tick(&Frames::in_world("W1", 1.0));
+    assert!(controller.snapshot().has_player);
+    controller.tick(&FrameStatus { has_player: false, ..Frames::in_world("W1", 2.0) });
+    assert!(controller.snapshot().in_world);
+    assert!(!controller.snapshot().has_player);
+    controller.tick(&Frames::in_world("W1", 3.0));
+    assert!(controller.snapshot().has_player);
+}
+
+#[test]
 fn placing_a_marker_makes_it_the_active_one() {
     let data = tempfile::tempdir().unwrap();
     let mut controller = ControllerHarness::start(data.path());
     Scene::import(&mut controller, data.path(), "tower", &Scene::stone());
     controller.tick(&Frames::in_world("W1", 1.0));
     Scene::place(&mut controller, "First");
+    controller.tick(&Frames::in_world("W1", 2.0));
     Scene::place(&mut controller, "Second");
 
     let rows = controller.snapshot().markers.clone();
@@ -205,6 +220,7 @@ fn a_full_marker_set_refuses_with_a_notice() {
     Scene::import(&mut controller, data.path(), "tower", &Scene::stone());
     controller.tick(&Frames::in_world("W1", 1.0));
     Scene::place(&mut controller, "First");
+    controller.tick(&Frames::in_world("W1", 2.0));
     Scene::place(&mut controller, "Second");
     assert_eq!(controller.snapshot().markers.len(), 1);
     assert!(matches!(Scene::notices(&controller)[0], ImportNotice::MarkerRefused(_)));
@@ -642,24 +658,20 @@ fn snapshot_revision_only_moves_on_change() {
 }
 
 #[test]
-fn walking_changes_the_revision_only_when_a_distance_changes() {
+fn walking_leaves_the_marker_rows_and_the_revision_alone() {
     let data = tempfile::tempdir().unwrap();
     let mut controller = ControllerHarness::start(data.path());
     Scene::import(&mut controller, data.path(), "tower", &Scene::stone());
-    controller.tick(&Frames::at("W1", [0, 64, 0], 1.0));
+    controller.tick(&Frames::at("W1", [-3, -12, -340], 1.0));
     Scene::place(&mut controller, "Home");
+    controller.tick(&Frames::at("W1", [-3, -12, -340], 1.1));
     let placed = controller.snapshot().revision;
+    assert_eq!(controller.snapshot().markers[0].origin, [-3, -12, -340]);
 
-    // A new position at a new distance changes the snapshot.
-    controller.tick(&Frames::at("W1", [3, 64, 4], 1.1));
-    assert_eq!(controller.snapshot().markers[0].distance, 5);
-    let first = controller.snapshot().revision;
-    assert!(first > placed);
-
-    // A different position at the same rounded distance does not.
-    controller.tick(&Frames::at("W1", [4, 64, 3], 1.2));
-    assert_eq!(controller.snapshot().markers[0].distance, 5);
-    assert_eq!(controller.snapshot().revision, first);
+    controller.tick(&Frames::at("W1", [40, 64, 3], 1.2));
+    controller.tick(&Frames::at("W1", [-90, 70, 12], 1.3));
+    assert_eq!(controller.snapshot().markers[0].origin, [-3, -12, -340]);
+    assert_eq!(controller.snapshot().revision, placed);
 }
 
 #[test]
@@ -2276,4 +2288,44 @@ fn a_pending_placement_expires_on_the_tick_without_a_use_call() {
     controller.tick(&Frames::in_world(GhostScene::WORLD, 4.0));
 
     assert_eq!(controller.easy_place_telemetry().rejected, 1);
+}
+
+#[test]
+fn two_place_actions_for_one_target_give_one_marker() {
+    let data = tempfile::tempdir().unwrap();
+    let mut controller = ControllerHarness::start(data.path());
+    Scene::import(&mut controller, data.path(), "tower", &Scene::stone());
+    controller.tick(&Frames::at("W1", [5, 64, -9], 1.0));
+    // two actions from one frame, and one more from the next frame
+    Scene::place(&mut controller, "Home");
+    Scene::place(&mut controller, "Home");
+    controller.tick(&Frames::at("W1", [5, 64, -9], 1.02));
+    Scene::place(&mut controller, "Home");
+    assert_eq!(controller.snapshot().markers.len(), 1);
+    // the second click of a double click
+    controller.tick(&Frames::at("W1", [5, 64, -9], 1.3));
+    Scene::place(&mut controller, "Home");
+    assert_eq!(controller.snapshot().markers.len(), 1);
+    assert!(controller.snapshot().markers[0].active);
+
+    // a click a moment later is a new marker, even from the same block
+    controller.tick(&Frames::at("W1", [5, 64, -9], 2.0));
+    Scene::place(&mut controller, "Home");
+    assert_eq!(controller.snapshot().markers.len(), 2);
+}
+
+#[test]
+fn a_place_for_another_target_at_once_is_a_new_marker() {
+    let data = tempfile::tempdir().unwrap();
+    let mut controller = ControllerHarness::start(data.path());
+    Scene::import(&mut controller, data.path(), "tower", &Scene::stone());
+    controller.tick(&Frames::at("W1", [5, 64, -9], 1.0));
+    Scene::place(&mut controller, "Home");
+    let structure = Scene::marker_target(&controller);
+    controller.apply(LibraryAction::CreateProject("Keep".to_owned()));
+    let project = MarkerTarget::Project(controller.snapshot().projects[0].id);
+    controller.apply(LibraryAction::PlaceMarker { name: "Keep".to_owned(), target: project });
+    let targets: Vec<MarkerTarget> = controller.snapshot().markers.iter().map(|row| row.target).collect();
+    assert_eq!(targets.len(), 2);
+    assert!(targets.contains(&structure) && targets.contains(&project));
 }

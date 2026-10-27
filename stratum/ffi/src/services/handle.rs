@@ -2,12 +2,13 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use amm_client::link::ApiTable;
 use amm_core::errors::LinkError;
+use stratum_core::config::PreviewConfig;
 use stratum_core::services::StratumController;
-use stratum_core::services::preview::PreviewService;
-use stratum_core::structs::preview::PreviewSource;
+use stratum_core::services::preview::{PreviewService, SourceLocator};
 
 use super::{HandleState, ManagerSession, SharedGhost, SharedUi};
 
@@ -22,16 +23,21 @@ pub struct StHandle {
 }
 
 impl StHandle {
+    // The wait for the preview thread at shutdown.
+    pub const PREVIEW_SHUTDOWN_BUDGET: Duration = Duration::from_millis(500);
+
     // Registers with the manager and starts the controller from the manager's config; an unreadable config
     // gives the defaults. `config_dir` is the mod's LeviLamina config folder and `data_dir` the folder for the
     // library, both absolute paths.
     pub fn connect(table: ApiTable, config_dir: &Path, data_dir: &Path) -> Result<Self, LinkError> {
-        let source = PreviewSource::locate(data_dir);
-        let preview = PreviewService::new_shared(source);
-        let shared = SharedUi::new_shared_with_preview(preview);
+        // the preview starts before the session, whose frame handler holds it; the manager gives the config only
+        // after the registration, so the preview starts with the default bounds and takes the config below
+        let preview = PreviewService::new_shared(SourceLocator::locate(data_dir), &PreviewConfig::default());
+        let shared = SharedUi::new_shared(Some(preview));
         let session = ManagerSession::connect(table, config_dir, Arc::clone(&shared))?;
         let config = session.config().unwrap_or_default();
         shared.meter().set_enabled(config.debug.telemetry);
+        shared.reconfigure_preview(&config.preview);
         let controller = StratumController::new(data_dir.to_path_buf(), config);
         let ghost = SharedGhost::new_shared();
         let state = Mutex::new(HandleState::new(controller, session, Arc::clone(&shared), Arc::clone(&ghost)));
@@ -66,8 +72,9 @@ impl StHandle {
         &self.ghost
     }
 
-    // Stops the controller within its budget, then unregisters from the manager. A poisoned lock still drops
-    // the state, so the registration ends either way.
+    // Stops in reverse start order: the controller within its budget, then the session unregisters from the
+    // manager, so no frame reaches the preview again, then the preview thread within `PREVIEW_SHUTDOWN_BUDGET`. A
+    // poisoned lock still drops the state, so the registration ends either way.
     pub fn shutdown(self) {
         let mut state = match self.state.into_inner() {
             Ok(state) => state,
@@ -75,5 +82,10 @@ impl StHandle {
         };
         state.shutdown();
         drop(state);
+        if let Some(preview) = self.shared.preview()
+            && !preview.shutdown(Self::PREVIEW_SHUTDOWN_BUDGET)
+        {
+            curia::error!("preview thread did not stop before shutdown", {});
+        }
     }
 }

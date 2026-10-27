@@ -71,13 +71,16 @@ impl ProjectPage {
         if project.structures.is_empty() {
             // a marker for a project with no structure shows nothing, so both marker items wait
             let nothing = Some(Text::message(StratumMessage::ProjectEmptyTitle));
-            title.show_beside(ui, |ui| ProjectMenu::show(ui, snapshot, project, nothing, state), |_| {});
+            let mut placed = None;
+            title.show_beside(ui, |ui| placed = ProjectMenu::show(ui, snapshot, project, nothing, state), |_| {});
+            out.extend(placed);
             ui.add_space(PageTitle::SECTION_GAP);
             Self::show_empty(ui, snapshot, project, out);
             return;
         }
         let blocked = Self::blocked(project, Self::layout_of(snapshot, project));
-        let beside = |ui: &mut Ui| ProjectMenu::show(ui, snapshot, project, blocked, state);
+        let mut placed = None;
+        let beside = |ui: &mut Ui| placed = ProjectMenu::show(ui, snapshot, project, blocked, state);
         title.show_beside(ui, beside, |ui| {
             Self::big_build(ui, snapshot, project, out);
             ui.add_space(<spacing::L as SpacingToken>::VALUE);
@@ -85,6 +88,7 @@ impl ProjectPage {
                 out.push(LibraryAction::RequestFilePicker(Some(project.id)));
             }
         });
+        out.extend(placed);
 
         ui.add_space(PageTitle::SECTION_GAP);
         let mut selected = match state.project_tab {
@@ -135,7 +139,7 @@ impl ProjectPage {
         ui.allocate_rect(area, Sense::hover());
         let mut list_ui = ui.new_child(UiBuilder::new().max_rect(list).layout(Layout::top_down(Align::Min)));
         let selected = Self::selected(project, state);
-        Self::show_list(&mut list_ui, snapshot, project, layout, selected, state);
+        Self::show_list(&mut list_ui, snapshot, project, layout, selected, state, out);
         let mut card_ui = ui.new_child(UiBuilder::new().max_rect(card).layout(Layout::top_down(Align::Min)));
         Self::show_card(&mut card_ui, snapshot, project, layout, state, out, preview);
     }
@@ -202,6 +206,7 @@ impl ProjectPage {
         layout: Option<&Result<BigBuildLayout, LayoutIssue>>,
         selected: Option<StructureId>,
         state: &mut LibraryUiState,
+        out: &mut Vec<LibraryAction>,
     ) {
         let area = ScrollArea::vertical().id_salt(StratumId::StructureListScroll).auto_shrink([false, false]);
         ScrollBar::show(ui, area, false, |ui| {
@@ -209,7 +214,8 @@ impl ProjectPage {
             for row in &project.structures {
                 let subtitle = Self::subtitle(project, layout, row);
                 let strength = state.pick_flash.strength(row.id, now);
-                let place = (project.kind == ProjectKind::Normal).then(|| MarkerActions::row_action(snapshot));
+                let target = MarkerTarget::Structure(row.id);
+                let place = (project.kind == ProjectKind::Normal).then(|| MarkerActions::row_action(snapshot, target));
                 let open = selected == Some(row.id);
                 let response = Self::structure_row(ui, row, subtitle, (strength, open), place);
                 if strength > 0.0 {
@@ -219,7 +225,7 @@ impl ProjectPage {
                     response.row.scroll_to_me(Some(Align::Center));
                 }
                 if response.action {
-                    MarkerActions::open_place(state, row.id);
+                    out.extend(MarkerActions::place(snapshot, target));
                 } else if response.row.clicked() {
                     // a big build has no card of one structure, so its row click opens the page
                     let enter = open && response.row.has_focus() && ui.input(|input| input.key_pressed(Key::Enter));
@@ -250,7 +256,7 @@ impl ProjectPage {
             let height = ui.max_rect().height();
             let area = ScrollArea::vertical().id_salt(StratumId::ProjectCardScroll).auto_shrink([false, false]);
             ScrollBar::show(ui, area, false, |ui| {
-                FactsPanel::show(ui, snapshot, row, Some(&project.name), state, height, preview);
+                out.extend(FactsPanel::show(ui, snapshot, row, state, height, preview));
             });
             return;
         }
@@ -274,7 +280,7 @@ impl ProjectPage {
                     Self::grid_editor(ui, snapshot, project, out);
                 }
                 CardFooter::show(ui, bottom, inset, |ui| {
-                    MarkerActions::show(ui, snapshot, MarkerTarget::Project(project.id), blocked, state);
+                    out.extend(MarkerActions::show(ui, snapshot, MarkerTarget::Project(project.id), blocked, state));
                 });
             });
         });

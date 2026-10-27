@@ -1,4 +1,5 @@
 use egui::{Pos2, Rect};
+use stratum_core::structs::action::LibraryAction;
 use stratum_core::structs::layout::LayoutIssue;
 use stratum_core::structs::library::{ProjectId, ProjectKind, StructureId};
 use stratum_core::structs::marker::MarkerTarget;
@@ -104,7 +105,7 @@ fn delete_opens_the_delete_dialog_for_the_project() {
 }
 
 #[test]
-fn assign_and_place_open_their_dialogs_for_the_project() {
+fn assign_opens_its_dialog_and_place_places_the_project_marker_at_once() {
     let target = MarkerTarget::Project(ProjectId(7));
     let mut session = Menu::normal();
     Menu::open(&mut session);
@@ -116,10 +117,20 @@ fn assign_and_place_open_their_dialogs_for_the_project() {
     Menu::open(&mut session);
     let item = Menu::item(&session, "Place marker here").expect("item is painted");
     session.click(item);
-    let Some(Dialog::PlaceMarker(dialog)) = &session.state.dialog else {
-        panic!("the place marker dialog is open");
-    };
-    assert_eq!(dialog.target(), target);
+    assert_eq!(session.actions, [LibraryAction::PlaceMarker { name: "Willow Manor".to_owned(), target }]);
+    assert_eq!(session.state.dialog, None, "no dialog opens");
+}
+
+#[test]
+fn place_is_off_when_markers_are_read_only() {
+    let mut session = Menu::normal();
+    session.snapshot.markers_read_only = true;
+    session.frame(Vec::new());
+    Menu::open(&mut session);
+    let place = Menu::item(&session, "Place marker here").expect("item is painted");
+    session.click(place);
+    assert!(session.actions.is_empty(), "{:?}", session.actions);
+    assert_eq!(session.state.dialog, None);
 }
 
 #[test]
@@ -146,6 +157,7 @@ fn place_waits_for_a_world_and_assign_for_a_marker() {
     let place = Menu::item(&session, "Place marker here").expect("item is painted");
     session.click(place);
     assert_eq!(session.state.dialog, None);
+    assert!(session.actions.is_empty(), "{:?}", session.actions);
     let assign = Menu::item(&session, "Assign to marker…").expect("the menu stays open");
     session.click(assign);
     assert_eq!(session.state.dialog, None);

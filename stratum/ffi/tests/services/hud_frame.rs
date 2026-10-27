@@ -76,7 +76,7 @@ impl HudPass {
 
 #[test]
 fn hud_frame_draws_only_while_hud_shown() {
-    let shared = SharedUi::new_shared();
+    let shared = SharedUi::new_shared(None);
     let mut frame = HudFrame::new(Arc::clone(&shared));
     let mut pass = HudPass::new();
     shared.publish(Arc::new(HudPass::with_card()));
@@ -96,7 +96,7 @@ fn hud_frame_draws_only_while_hud_shown() {
 
 #[test]
 fn hud_frame_draws_nothing_without_a_card_row() {
-    let shared = SharedUi::new_shared();
+    let shared = SharedUi::new_shared(None);
     let mut frame = HudFrame::new(Arc::clone(&shared));
     shared.publish_hud(Some(HudState::new()));
 
@@ -105,7 +105,7 @@ fn hud_frame_draws_nothing_without_a_card_row() {
 
 #[test]
 fn the_router_sends_the_hud_layer_to_the_card_and_the_overlay_to_the_library() {
-    let shared = SharedUi::new_shared();
+    let shared = SharedUi::new_shared(None);
     let mut router = FrameRouter::new(Arc::clone(&shared));
     let mut pass = HudPass::new();
     shared.publish(Arc::new(HudPass::with_card()));

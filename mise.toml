@@ -22,6 +22,12 @@ description = "Every workspace test through cargo-nextest"
 dir = "{{config_root}}"
 run = "cargo nextest run --workspace"
 
+[tasks.bench]
+description = "Every stratum-core Criterion bench, at most 8 build jobs; arguments after the task name filter the benches"
+dir = "{{config_root}}"
+env = { CARGO_BUILD_JOBS = "8" }
+run = "cargo bench -p stratum-core"
+
 [tasks.header]
 description = "Regenerates shim/include/stratum.h from the stratum-ffi crate"
 dir = "{{config_root}}"

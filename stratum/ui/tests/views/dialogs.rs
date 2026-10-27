@@ -4,7 +4,7 @@ use stratum_core::structs::library::{ProjectId, ProjectKind, StructureId};
 use stratum_core::structs::marker::{MarkerId, MarkerTarget};
 use stratum_core::structs::snapshot::LibrarySnapshot;
 use stratum_ui::state::{Dialog, DialogItem, Page};
-use stratum_ui::views::dialogs::{AssignDialog, AssignSubject, PlaceMarkerDialog, RenameDialog};
+use stratum_ui::views::dialogs::{AssignDialog, AssignSubject, RenameDialog};
 
 use crate::support::{ShapeProbe, SnapshotFixture, ViewSession};
 
@@ -87,27 +87,23 @@ fn place_marker_disabled_outside_a_world() {
 }
 
 #[test]
-fn place_marker_dialog_confirm_is_disabled_outside_a_world() {
+fn place_marker_disabled_when_markers_are_read_only() {
     let mut snapshot = SnapshotFixture::library();
-    snapshot.in_world = false;
+    snapshot.markers_read_only = true;
     let mut session = Scenes::structure_page(snapshot);
-    let dialog = PlaceMarkerDialog::new(MarkerTarget::Structure(StructureId(1)));
-    Scenes::open_dialog(&mut session, Dialog::PlaceMarker(dialog));
-    Scenes::click_last(&mut session, "Place marker here");
+    Scenes::click_first(&mut session, "Place marker here");
+    assert!(session.state.dialog.is_none());
     assert!(session.actions.is_empty(), "{:?}", session.actions);
-    assert!(session.state.dialog.is_some(), "a click on the disabled button keeps the dialog open");
 }
 
 #[test]
-fn place_marker_pushes_the_target_and_its_name() {
+fn place_marker_pushes_the_target_and_its_name_at_once() {
     let mut session = Scenes::structure_page(SnapshotFixture::library());
     Scenes::click_first(&mut session, "Place marker here");
-    assert!(session.state.dialog.is_some());
-    Scenes::click_last(&mut session, "Place marker here");
     let expected =
         LibraryAction::PlaceMarker { name: "Main hall".to_owned(), target: MarkerTarget::Structure(StructureId(1)) };
     assert_eq!(session.actions, [expected]);
-    assert!(session.state.dialog.is_none());
+    assert!(session.state.dialog.is_none(), "no dialog opens");
 }
 
 #[test]
@@ -180,17 +176,6 @@ fn new_project_dialog_refuses_long_name() {
     Scenes::click_last(&mut session, "Name");
     session.type_text(&"b".repeat(65));
     Scenes::click_last(&mut session, "Create");
-    assert!(session.actions.is_empty(), "{:?}", session.actions);
-    assert!(session.state.dialog.is_some());
-}
-
-#[test]
-fn place_marker_dialog_refuses_long_name() {
-    let mut snapshot = SnapshotFixture::library();
-    snapshot.projects[0].structures[0].name = "c".repeat(65);
-    let mut session = Scenes::structure_page(snapshot);
-    Scenes::click_first(&mut session, "Place marker here");
-    Scenes::click_last(&mut session, "Place marker here");
     assert!(session.actions.is_empty(), "{:?}", session.actions);
     assert!(session.state.dialog.is_some());
 }
@@ -308,4 +293,52 @@ fn assign_dialog_from_a_marker_picks_a_project() {
     Scenes::click_last(&mut session, "Assign");
     let target = MarkerTarget::Project(ProjectId(1));
     assert_eq!(session.actions, [LibraryAction::AssignMarker(MarkerId(2), target)]);
+}
+
+// The reason a disabled "Place marker here" gives in its tooltip, read after the pointer rests on the button.
+struct PlaceReason;
+
+impl PlaceReason {
+    const NOT_IN_WORLD: &str = "Join a world to place a marker";
+    const READ_ONLY: &str = "The marker file of this world could not be read";
+
+    fn hovered(snapshot: LibrarySnapshot) -> ViewSession {
+        let mut session = Scenes::structure_page(snapshot);
+        let spot = ShapeProbe::text_centre(&session.shapes, "Place marker here").expect("button is painted");
+        session.hover(spot);
+        session
+    }
+
+    fn count(session: &ViewSession, text: &str) -> usize {
+        ShapeProbe::exact_rects(&session.shapes, text).len()
+    }
+}
+
+#[test]
+fn place_marker_outside_a_world_says_to_join_one() {
+    let mut snapshot = SnapshotFixture::library();
+    snapshot.in_world = false;
+    let session = PlaceReason::hovered(snapshot);
+    assert_eq!(PlaceReason::count(&session, PlaceReason::NOT_IN_WORLD), 1);
+}
+
+#[test]
+fn place_marker_with_read_only_markers_names_the_marker_file() {
+    let mut snapshot = SnapshotFixture::library();
+    snapshot.markers_read_only = true;
+    let session = PlaceReason::hovered(snapshot);
+    // the banner over the page and the tooltip
+    assert_eq!(PlaceReason::count(&session, PlaceReason::READ_ONLY), 2);
+    assert_eq!(PlaceReason::count(&session, PlaceReason::NOT_IN_WORLD), 0);
+}
+
+#[test]
+fn not_in_a_world_comes_before_read_only_markers() {
+    let mut snapshot = SnapshotFixture::library();
+    snapshot.in_world = false;
+    snapshot.markers_read_only = true;
+    let session = PlaceReason::hovered(snapshot);
+    assert_eq!(PlaceReason::count(&session, PlaceReason::NOT_IN_WORLD), 1);
+    // only the banner
+    assert_eq!(PlaceReason::count(&session, PlaceReason::READ_ONLY), 1);
 }

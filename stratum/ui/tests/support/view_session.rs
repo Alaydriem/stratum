@@ -5,7 +5,10 @@ use egui::{
 };
 use levi_ui::font::FontSource;
 use levi_ui::theme::Theme;
+use stratum_core::config::PreviewConfig;
+use stratum_core::services::preview::PreviewService;
 use stratum_core::structs::action::LibraryAction;
+use stratum_core::structs::preview::PreviewSource;
 use stratum_core::structs::snapshot::LibrarySnapshot;
 use stratum_ui::state::LibraryUiState;
 use stratum_ui::views::LibraryView;
@@ -35,11 +38,28 @@ impl ViewSession {
 
     // A session that has drawn a few frames, so the layout has settled.
     pub fn new(snapshot: LibrarySnapshot) -> Self {
+        Self::with_view(snapshot, LibraryView::new(None))
+    }
+
+    // Like `new`, with the 3D preview in the structure card. The service has no textures and no structure files,
+    // so the pane shows that it has no picture.
+    pub fn with_preview(snapshot: LibrarySnapshot) -> Self {
+        Self::with_preview_files(snapshot, std::env::temp_dir().join("stratum-none"))
+    }
+
+    // Like `with_preview`, reading the structure files from `structures`. With no textures the blocks draw in the
+    // grey stand-in.
+    pub fn with_preview_files(snapshot: LibrarySnapshot, structures: std::path::PathBuf) -> Self {
+        let service = PreviewService::new_shared(PreviewSource::new(None, structures), &PreviewConfig::default());
+        Self::with_view(snapshot, LibraryView::new(Some(service)))
+    }
+
+    fn with_view(snapshot: LibrarySnapshot, view: LibraryView) -> Self {
         let ctx = Context::default();
         Theme::install(&ctx, FontSource::BuiltIn);
         let mut session = Self {
             ctx,
-            view: LibraryView::new(),
+            view,
             state: LibraryUiState::new(),
             snapshot,
             actions: Vec::new(),
@@ -91,6 +111,14 @@ impl ViewSession {
         output.textures_delta.clear();
         self.commands.append(&mut output.platform_output.commands);
         self.shapes = output.shapes;
+    }
+
+    // Rests the pointer on `pos` for long enough that a tooltip opens.
+    pub fn hover(&mut self, pos: Pos2) {
+        self.frame(vec![Event::PointerMoved(pos)]);
+        for _ in 0..12 {
+            self.frame(Vec::new());
+        }
     }
 
     // Moves the pointer to `pos`, presses and releases the primary button, each in its own frame.

@@ -63,8 +63,8 @@ impl ManyMarkers {
     fn two(target: MarkerTarget) -> LibrarySnapshot {
         let mut snapshot = SnapshotFixture::library();
         snapshot.markers = vec![
-            SnapshotFixture::marker(1, "East wing", 12, false, TargetState::Ok),
-            SnapshotFixture::marker(2, "Lighthouse", 214, false, TargetState::Missing),
+            SnapshotFixture::marker(1, "East wing", [12, 64, -340], false, TargetState::Ok),
+            SnapshotFixture::marker(2, "Lighthouse", [214, 64, -340], false, TargetState::Missing),
         ];
         snapshot.markers[0].target = target;
         snapshot
@@ -73,10 +73,26 @@ impl ManyMarkers {
     fn snapshot(count: u64) -> LibrarySnapshot {
         let mut snapshot = SnapshotFixture::library();
         snapshot.markers = (1..=count)
-            .map(|n| SnapshotFixture::marker(n, &format!("Marker {n}"), 10 * n as i32, false, TargetState::Ok))
+            .map(|n| {
+                SnapshotFixture::marker(n, &format!("Marker {n}"), [10 * n as i32, 64, -340], false, TargetState::Ok)
+            })
             .collect();
         snapshot
     }
+}
+
+#[test]
+fn a_marker_row_shows_its_position_and_no_distance() {
+    let mut snapshot = ManyMarkers::two(MarkerTarget::Project(ProjectId(2)));
+    snapshot.markers[0].origin = [112, -12, -340];
+    let session = ViewSession::new(snapshot);
+    let name = ShapeProbe::text_rect(&session.shapes, "East wing").expect("marker row is painted");
+    let position = ShapeProbe::exact_rects(&session.shapes, "112 -12 -340")
+        .into_iter()
+        .find(|rect| (rect.center().y - name.center().y).abs() < 4.0)
+        .expect("the position is on the name line");
+    assert!(position.left() > name.right(), "the position follows the name");
+    assert!(ShapeProbe::text_rect(&session.shapes, "12 m").is_none(), "no distance is painted");
 }
 
 #[test]
@@ -180,4 +196,23 @@ fn row_delete_is_off_when_markers_are_read_only() {
         ShapeProbe::text_rect(&session.shapes, "Markers are read only this session").is_some(),
         "the disabled reason shows"
     );
+}
+
+#[test]
+fn a_long_marker_name_is_cut_and_the_position_stays_on_the_row() {
+    let mut snapshot = ManyMarkers::two(MarkerTarget::Project(ProjectId(2)));
+    let name = "W".repeat(64);
+    snapshot.markers[0].name = name.clone();
+    snapshot.markers[0].origin = [-30000, -64, 29999];
+    let session = ViewSession::new(snapshot);
+    let cut = ShapeProbe::text_rect(&session.shapes, "WWWW").expect("the cut name is painted");
+    // Paper: Markers, the text column of a marker row is 303 wide; 64 W do not fit in it
+    assert!(cut.width() < 303.0, "the name {cut:?} is cut to the row");
+    let position = ShapeProbe::exact_rects(&session.shapes, "-30000 -64 29999")
+        .into_iter()
+        .find(|rect| (rect.center().y - cut.center().y).abs() < 4.0)
+        .expect("the position is on the name line");
+    assert!(cut.right() < position.left(), "the name ends before the position");
+    // Paper: Sidebar, 470 wide, 21 padding at the right
+    assert!(position.right() <= session.panel.min.x + 470.0 - 21.0, "the position {position:?} leaves the row");
 }

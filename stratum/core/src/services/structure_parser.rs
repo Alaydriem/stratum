@@ -16,8 +16,16 @@ impl StructureParser {
     // Palette indices are stored as u16 with u16::MAX meaning no block, so this many entries
     // or more cannot be stored.
     const MAX_PALETTE: usize = BlockLayer::NONE as usize;
+    // Cells read between two checks of the stop in `parse_until`.
+    const STOP_EVERY: usize = 1 << 16;
 
     pub fn parse(bytes: &[u8]) -> Result<Structure, StructureError> {
+        Self::parse_until(bytes, || false)
+    }
+
+    // Like `parse`, ending with `Stopped` as soon as `stopped` returns true; it is asked once per `STOP_EVERY` cells
+    // of each block layer.
+    pub fn parse_until(bytes: &[u8], stopped: impl Fn() -> bool) -> Result<Structure, StructureError> {
         let (_, root) = NbtReader::read(bytes, NbtLimits::STRUCTURE)?;
 
         let size = Self::read_size(&root)?;
@@ -36,8 +44,8 @@ impl StructureParser {
         let [primary, secondary] = Self::list(structure, "block_indices")? else {
             return Err(StructureError::MissingField("block_indices"));
         };
-        let primary = Self::dense_layer(&Self::layer_bytes(bytes, primary, volume)?, palette.len())?;
-        let secondary = Self::sparse_layer(&Self::layer_bytes(bytes, secondary, volume)?, &palette)?;
+        let primary = Self::dense_layer(&Self::layer_bytes(bytes, primary, volume)?, palette.len(), &stopped)?;
+        let secondary = Self::sparse_layer(&Self::layer_bytes(bytes, secondary, volume)?, &palette, &stopped)?;
 
         Ok(Structure { size, world_origin, palette, primary, secondary })
     }
@@ -157,9 +165,10 @@ impl StructureParser {
     }
 
     // One u16 per cell, read straight from the i32 bytes.
-    fn dense_layer(raw: &[u8], palette_len: usize) -> Result<BlockLayer, StructureError> {
+    fn dense_layer(raw: &[u8], palette_len: usize, stopped: &impl Fn() -> bool) -> Result<BlockLayer, StructureError> {
         let mut cells = Vec::with_capacity(raw.len() / 4);
-        for index in Self::values(raw) {
+        for (cell, index) in Self::values(raw).enumerate() {
+            Self::check_stop(cell, stopped)?;
             cells.push(Self::palette_index(index, palette_len)?);
         }
         Ok(BlockLayer::new(cells))
@@ -167,11 +176,16 @@ impl StructureParser {
 
     // Keeps the cells that hold a block other than air or structure void. The first pass checks
     // every index and counts the kept cells, so the second pass allocates the exact size.
-    fn sparse_layer(raw: &[u8], palette: &[BlockState]) -> Result<SparseLayer, StructureError> {
+    fn sparse_layer(
+        raw: &[u8],
+        palette: &[BlockState],
+        stopped: &impl Fn() -> bool,
+    ) -> Result<SparseLayer, StructureError> {
         let kept: Vec<bool> = palette.iter().map(|block| !block.is_empty_block()).collect();
         let keep = |index: u16| kept.get(usize::from(index)).copied().unwrap_or(false);
         let mut count = 0usize;
-        for index in Self::values(raw) {
+        for (cell, index) in Self::values(raw).enumerate() {
+            Self::check_stop(cell, stopped)?;
             if keep(Self::palette_index(index, palette.len())?) {
                 count += 1;
             }
@@ -187,5 +201,9 @@ impl StructureParser {
             }
         }
         Ok(SparseLayer::new(cells, blocks))
+    }
+
+    fn check_stop(cell: usize, stopped: &impl Fn() -> bool) -> Result<(), StructureError> {
+        if cell.is_multiple_of(Self::STOP_EVERY) && stopped() { Err(StructureError::Stopped) } else { Ok(()) }
     }
 }

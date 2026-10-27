@@ -12,4 +12,6 @@ pub struct PreviewStats {
     pub width: u32,
     pub height: u32,
     pub size: StructureSize,
+    // Decoded textures the texture pack holds after this render.
+    pub textures_cached: usize,
 }

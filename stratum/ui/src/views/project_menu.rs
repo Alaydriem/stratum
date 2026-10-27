@@ -3,6 +3,7 @@ use levi_i18n::text::Text;
 use levi_ui::icon::Icon;
 use levi_ui::state::DisabledReason;
 use levi_ui::widget::{IconButton, Menu, MenuItem, MenuLeading, MenuTone};
+use stratum_core::structs::action::LibraryAction;
 use stratum_core::structs::marker::MarkerTarget;
 use stratum_core::structs::snapshot::{LibrarySnapshot, ProjectRow};
 
@@ -15,14 +16,14 @@ pub struct ProjectMenu;
 
 impl ProjectMenu {
     // The chevron button, and the menu it opens. `blocked` is a reason that holds back Assign and Place, such as pieces
-    // that are not placed yet.
+    // that are not placed yet. Returns the action of Place marker here when it was clicked.
     pub fn show(
         ui: &mut Ui,
         snapshot: &LibrarySnapshot,
         project: &ProjectRow,
         blocked: Option<Text>,
         state: &mut LibraryUiState,
-    ) {
+    ) -> Option<LibraryAction> {
         let id = project.id;
         let target = MarkerTarget::Project(id);
         // the button shows as pressed while the menu is open; the flag is the one the last frame ended with, and a change asks for a new frame
@@ -34,8 +35,9 @@ impl ProjectMenu {
             .show(ui);
         let writable = !snapshot.library_read_only;
         let read_only = || DisabledReason::message(StratumMessage::ReadOnlyReason);
-        let place_reason = MarkerActions::place_reason(snapshot, blocked.clone());
+        let place_reason = MarkerActions::place_reason(snapshot, target, blocked.clone());
         let assign_reason = MarkerActions::assign_reason(snapshot, blocked);
+        let mut placed = None;
         let open = Menu::show_from_button(&button, |ui| {
             ui.spacing_mut().item_spacing = Vec2::ZERO;
             let rename = MenuItem::new(Text::message(StratumMessage::Rename))
@@ -52,7 +54,7 @@ impl ProjectMenu {
                 MenuItem::new(Text::message(StratumMessage::PlaceMarkerHere)).leading(MenuLeading::Icon(Icon::Pin));
             let place = Self::gate(place, place_reason);
             if place.show(ui).clicked() {
-                MarkerActions::open_place_target(state, target);
+                placed = MarkerActions::place(snapshot, target);
             }
             Menu::separator(ui);
             let delete = MenuItem::new(Text::message(StratumMessage::Delete))
@@ -67,6 +69,7 @@ impl ProjectMenu {
         if open != was_open {
             ui.ctx().request_repaint();
         }
+        placed
     }
 
     // The item, held off with `reason` when there is one.

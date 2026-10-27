@@ -1,6 +1,6 @@
 use super::{BlockShape, Occlusion};
 
-// What the preview draws for one palette entry: the shape, a mesh texture per face in `BlockFace` order, and how
+// What the preview draws for one palette entry: the shape, a mesh texture per face in `Face` order, and how
 // the block hides its neighbours.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BlockLook {

@@ -3,6 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use super::FrameMeter;
 use crossbeam_channel::{Receiver, Sender};
+use stratum_core::config::PreviewConfig;
 use stratum_core::services::preview::PreviewService;
 use stratum_core::structs::action::LibraryAction;
 use stratum_core::structs::hud::HudState;
@@ -31,7 +32,8 @@ pub struct SharedUi {
 impl SharedUi {
     pub const ACTION_CAPACITY: usize = 256;
 
-    pub fn new() -> Self {
+    // `preview` draws the 3D preview in the library card; None shows the size box instead.
+    pub fn new(preview: Option<Arc<PreviewService>>) -> Self {
         let (actions, inbox) = crossbeam_channel::bounded(Self::ACTION_CAPACITY);
         Self {
             snapshot: Mutex::new(Arc::new(LibrarySnapshot::empty())),
@@ -42,24 +44,23 @@ impl SharedUi {
             close_requested: AtomicBool::new(false),
             opens: AtomicU64::new(0),
             meter: FrameMeter::new(),
-            preview: None,
+            preview,
         }
     }
 
-    pub fn new_shared() -> Arc<Self> {
-        Arc::new(Self::new())
-    }
-
-    pub fn with_preview(preview: Arc<PreviewService>) -> Self {
-        Self { preview: Some(preview), ..Self::new() }
-    }
-
-    pub fn new_shared_with_preview(preview: Arc<PreviewService>) -> Arc<Self> {
-        Arc::new(Self::with_preview(preview))
+    pub fn new_shared(preview: Option<Arc<PreviewService>>) -> Arc<Self> {
+        Arc::new(Self::new(preview))
     }
 
     pub fn preview(&self) -> Option<&Arc<PreviewService>> {
         self.preview.as_ref()
+    }
+
+    // Game thread: hands new preview bounds to the preview thread; nothing happens without a preview.
+    pub fn reconfigure_preview(&self, config: &PreviewConfig) {
+        if let Some(preview) = &self.preview {
+            preview.reconfigure(config);
+        }
     }
 
     // The telemetry the frame fills and the tick reads.
@@ -170,11 +171,5 @@ impl SharedUi {
     // Render thread: the snapshot last published, or None while the tick holds the lock.
     pub fn try_snapshot(&self) -> Option<Arc<LibrarySnapshot>> {
         self.snapshot.try_lock().ok().map(|current| Arc::clone(&current))
-    }
-}
-
-impl Default for SharedUi {
-    fn default() -> Self {
-        Self::new()
     }
 }

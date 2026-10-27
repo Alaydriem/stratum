@@ -11,7 +11,8 @@ pub struct StructureRow {
     pub block_count: u64,
     pub project: Option<ProjectId>,
     pub grid_cell: Option<GridCell>,
-    pub has_origin: bool,
+    // The world position saved in the file, x y z; None when the file has none.
+    pub origin: Option<[i32; 3]>,
     // The stored file inside the structures folder.
     pub file_name: String,
 }
@@ -25,7 +26,7 @@ impl StructureRow {
             block_count: entry.block_count,
             project: entry.project,
             grid_cell: entry.grid_cell,
-            has_origin: entry.world_origin.is_some(),
+            origin: entry.world_origin,
             file_name: entry.file_name.clone(),
         }
     }

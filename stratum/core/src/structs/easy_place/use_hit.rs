@@ -1,4 +1,4 @@
-use super::Face;
+use crate::structs::block::Face;
 
 // The block the player's use ray hit.
 #[derive(Debug, Clone, Copy, PartialEq)]

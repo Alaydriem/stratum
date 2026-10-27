@@ -222,7 +222,7 @@ impl HudCard {
             }
             None => {
                 self.big = Text::message(StratumMessage::HudWholeBuild);
-                self.detail = Text::plural(StratumMessage::HudLayerCount, layers, Args::new());
+                self.detail = Text::plural(StratumMessage::LayerCount, layers, Args::new());
                 self.level = hud.y_range.map(|(low, high)| {
                     let args = Args::new().int("low", i64::from(low)).int("high", i64::from(high));
                     Text::format(StratumMessage::HudYRange, args)

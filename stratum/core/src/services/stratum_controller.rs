@@ -93,11 +93,11 @@ pub struct StratumController {
     seen_failures: u64,
     ticked: bool,
     snapshot: Arc<LibrarySnapshot>,
+    // The target and the time of the last marker placed, so a repeated click places nothing.
+    last_place: Option<(MarkerTarget, f64)>,
     changed: bool,
     // The library part of the snapshot (projects, structures, layouts) needs a rebuild.
     library_changed: bool,
-    // Marker rows computed while checking for movement, used by the next refresh if still valid.
-    marker_rows_ready: Option<Vec<MarkerRow>>,
     ghost: GhostService,
     ghost_frame: GhostFrame,
     // The time of `GhostService::update` per tick, read out by `take_ghost_tick`.
@@ -127,6 +127,9 @@ impl StratumController {
     pub const SAVE_INTERVAL_SECONDS: f64 = 1.0;
     pub const MAX_BACKOFF_SECONDS: f64 = 30.0;
     const MIN_POLL_SECONDS: f64 = 0.1;
+    // A second place for the same target within this time is the same click: the second action of one frame, a
+    // frame before the menu shows the first marker, or the second click of a double click (egui reads 0.3 s).
+    pub const PLACE_REPEAT_SECONDS: f64 = 0.5;
     // The most `shutdown` waits for the writes and the store thread together.
     pub const SHUTDOWN_BUDGET: Duration = Duration::from_secs(5);
 
@@ -198,9 +201,9 @@ impl StratumController {
             seen_failures: 0,
             ticked: false,
             snapshot: Arc::new(LibrarySnapshot::empty()),
+            last_place: None,
             changed: false,
             library_changed: false,
-            marker_rows_ready: None,
             ghost: GhostService::new(config.ghost.clone()),
             ghost_frame: GhostFrame::new(),
             ghost_tick: GhostTickMeter::new(),
@@ -224,13 +227,14 @@ impl StratumController {
     pub fn tick(&mut self, status: &FrameStatus) {
         let moved = status.feet != self.status.feet;
         let was_in_world = self.status.in_world;
+        let had_player = self.status.has_player;
         self.status.clone_from(status);
         // A world whose key the shim has not decided yet counts as no world: no marker set is
         // loaded or saved under an empty key, and placing a marker stays off.
         if self.status.world.is_empty() {
             self.status.in_world = false;
         }
-        if self.status.in_world != was_in_world {
+        if self.status.in_world != was_in_world || self.status.has_player != had_player {
             self.changed = true;
         }
         if !self.ticked {
@@ -822,6 +826,12 @@ impl StratumController {
     }
 
     fn place_marker(&mut self, name: &str, target: MarkerTarget) {
+        let now = self.status.time_seconds;
+        let repeat =
+            self.last_place.is_some_and(|(last, at)| last == target && (now - at) < Self::PLACE_REPEAT_SECONDS);
+        if repeat {
+            return;
+        }
         let origin = self.status.feet;
         let can_place = self.status.in_world && self.status.has_player;
         let Some(markers) = self.markers.as_mut().filter(|_| can_place) else {
@@ -833,6 +843,7 @@ impl StratumController {
                 if let Err(error) = markers.activate(id) {
                     curia::error!("placed marker could not be activated", { error: error.to_string() });
                 }
+                self.last_place = Some((target, now));
                 self.changed = true;
             }
             Err(error) => self.notify(ImportNotice::MarkerRefused(error)),
@@ -1257,21 +1268,13 @@ impl StratumController {
         }
     }
 
-    // When the player moved, finds out if a marker row changed. The rows are kept for the refresh
-    // unless something else changed this tick.
+    // When the player moved, finds out if the HUD row changed. Only a big build card follows the
+    // feet, to name the piece; the marker rows do not depend on the feet.
     fn check_movement(&mut self, moved: bool) {
         if !moved || self.markers.as_ref().is_none_or(|markers| markers.markers().is_empty()) {
             return;
         }
-        // only a big build card follows the feet, to name the piece
         if self.active_is_big_build() && self.hud_row(&self.snapshot.layouts) != self.snapshot.hud {
-            self.changed = true;
-        }
-        let rows = self.marker_rows();
-        if rows != self.snapshot.markers {
-            if !self.changed {
-                self.marker_rows_ready = Some(rows);
-            }
             self.changed = true;
         }
     }
@@ -1288,11 +1291,7 @@ impl StratumController {
             self.ghost.library_changed();
             self.ghost_failed.clear();
         }
-        let ready = self.marker_rows_ready.take();
-        let rows = match ready {
-            Some(rows) if !library_changed => rows,
-            _ => self.marker_rows(),
-        };
+        let rows = self.marker_rows();
         let current = Arc::clone(&self.snapshot);
         let library = library_changed.then(|| self.library_part());
         let layouts = library.as_ref().map_or(&current.layouts, |next| &next.layouts);
@@ -1343,6 +1342,7 @@ impl StratumController {
         snapshot.markers = rows;
         snapshot.hud = hud;
         snapshot.in_world = self.status.in_world;
+        snapshot.has_player = self.status.has_player;
         snapshot.materials.clone_from(&self.materials);
         snapshot.materials_loading = self.materials_job.as_ref().map(|job| job.scope);
         snapshot.materials_failed = self.materials_failed;
@@ -1357,6 +1357,7 @@ impl StratumController {
         snapshot.markers == rows
             && snapshot.hud == *hud
             && snapshot.in_world == self.status.in_world
+            && snapshot.has_player == self.status.has_player
             && snapshot.materials == self.materials
             && snapshot.materials_loading == self.materials_job.as_ref().map(|job| job.scope)
             && snapshot.materials_failed == self.materials_failed
@@ -1391,18 +1392,11 @@ impl StratumController {
                     target: marker.target,
                     target_name: target_name.unwrap_or_default(),
                     state: markers.target_state(marker.id, library),
-                    distance: self.distance_to(marker.origin),
+                    origin: marker.origin,
                     active: active == Some(marker.id),
                 }
             })
             .collect()
-    }
-
-    // Blocks from the player's feet to `origin`, rounded.
-    fn distance_to(&self, origin: [i32; 3]) -> i32 {
-        let feet = self.status.feet;
-        let squared: f64 = (0..3).map(|axis| (f64::from(origin[axis]) - f64::from(feet[axis])).powi(2)).sum();
-        squared.sqrt().round() as i32
     }
 
     fn structures_dir(&self) -> &Path {

@@ -13,11 +13,11 @@ impl OrbitCamera {
     pub const START_PITCH: f32 = 30.0;
     pub const MIN_PITCH: f32 = -60.0;
     pub const MAX_PITCH: f32 = 89.0;
-    /// spike: no Paper sheet yet. The smallest zoom, against the fitted start view.
+    /// The smallest zoom, against the fitted start view.
     pub const MIN_ZOOM: f32 = 0.5;
-    /// spike: no Paper sheet yet. The largest zoom, against the fitted start view.
+    /// The largest zoom, against the fitted start view.
     pub const MAX_ZOOM: f32 = 8.0;
-    /// spike: no Paper sheet yet. The zoom factor of one wheel step.
+    /// The zoom factor of one wheel step.
     pub const ZOOM_STEP: f32 = 1.15;
 
     pub fn new(yaw: f32, pitch: f32) -> Self {

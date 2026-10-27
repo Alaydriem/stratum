@@ -227,7 +227,7 @@ impl ManagerSession {
                     self.changed_config = Some(config);
                 }
                 curia::info!(
-                    "settings changed; the open key, telemetry and ghost settings apply now, the mesh budget after a restart",
+                    "settings changed; the open key, telemetry, ghost and preview settings apply now, the mesh budget after a restart",
                     {}
                 );
             }

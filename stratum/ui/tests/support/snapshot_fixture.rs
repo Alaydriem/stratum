@@ -17,7 +17,7 @@ impl SnapshotFixture {
             block_count: 4212,
             project: project.map(ProjectId),
             grid_cell: None,
-            has_origin: false,
+            origin: None,
             file_name: String::new(),
         }
     }
@@ -26,14 +26,14 @@ impl SnapshotFixture {
         ProjectRow { id: ProjectId(id), name: name.to_owned(), kind: ProjectKind::Normal, structures }
     }
 
-    pub fn marker(id: u64, name: &str, distance: i32, active: bool, state: TargetState) -> MarkerRow {
+    pub fn marker(id: u64, name: &str, origin: [i32; 3], active: bool, state: TargetState) -> MarkerRow {
         MarkerRow {
             id: MarkerId(id),
             name: name.to_owned(),
             target: MarkerTarget::Structure(StructureId(1)),
             target_name: if state == TargetState::Ok { "Main hall".to_owned() } else { String::new() },
             state,
-            distance,
+            origin,
             active,
         }
     }
@@ -49,10 +49,11 @@ impl SnapshotFixture {
         snapshot.unsorted = vec![Self::structure(4, "dock_crane", None), Self::structure(5, "mill_wheel", None)];
         snapshot.all_count = 4;
         snapshot.markers = vec![
-            Self::marker(2, "Lighthouse", 214, false, TargetState::Missing),
-            Self::marker(1, "East wing", 12, true, TargetState::Ok),
+            Self::marker(2, "Lighthouse", [214, 70, -9], false, TargetState::Missing),
+            Self::marker(1, "East wing", [112, 64, -340], true, TargetState::Ok),
         ];
         snapshot.in_world = true;
+        snapshot.has_player = true;
         snapshot
     }
 

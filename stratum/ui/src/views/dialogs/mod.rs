@@ -5,7 +5,6 @@ pub mod delete_dialog;
 pub mod dialog_form;
 pub mod move_dialog;
 pub mod new_project_dialog;
-pub mod place_marker_dialog;
 pub mod rename_dialog;
 
 pub use assign_choice::AssignChoice;
@@ -15,7 +14,6 @@ pub use delete_dialog::DeleteDialog;
 pub use dialog_form::DialogForm;
 pub use move_dialog::MoveDialog;
 pub use new_project_dialog::NewProjectDialog;
-pub use place_marker_dialog::PlaceMarkerDialog;
 pub use rename_dialog::RenameDialog;
 
 // Whether a dialog stays on the screen after a frame.

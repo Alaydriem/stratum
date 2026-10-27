@@ -61,8 +61,9 @@ msgctxt "tooltip"
 msgid "Delete marker"
 msgstr ""
 
+#. the block a marker stands on: x, y and z
 #, python-brace-format
-msgid "{meters} m"
+msgid "{x} {y} {z}"
 msgstr ""
 
 msgid "Active"
@@ -148,16 +149,7 @@ msgstr ""
 msgid "New · {x} × {y} × {z} · {blocks} blocks"
 msgstr ""
 
-msgid "STRUCTURE FACTS"
-msgstr ""
-
 msgid "Name"
-msgstr ""
-
-msgid "Project"
-msgstr ""
-
-msgid "Size"
 msgstr ""
 
 msgid "Layers"
@@ -166,10 +158,12 @@ msgstr ""
 msgid "Blocks"
 msgstr ""
 
-msgid "Saved origin"
+#. the world position saved in the structure file: x, y and z
+#, python-brace-format
+msgid "origin {x}, {y}, {z}"
 msgstr ""
 
-msgid "No saved position"
+msgid "no saved origin"
 msgstr ""
 
 msgid "Rename"
@@ -249,9 +243,6 @@ msgstr ""
 
 #, python-brace-format
 msgid "{x} × {y} × {z}"
-msgstr ""
-
-msgid "Saved in the file"
 msgstr ""
 
 #, python-brace-format
@@ -463,10 +454,6 @@ msgstr ""
 
 #, python-brace-format
 msgid "Move {name}"
-msgstr ""
-
-#, python-brace-format
-msgid "Shows {target}"
 msgstr ""
 
 msgid "Join a world to place a marker"
@@ -734,4 +721,12 @@ msgstr ""
 #. the time the last preview picture took to draw, in milliseconds
 #, python-brace-format
 msgid "{ms} ms"
+msgstr ""
+
+#. how to move the camera of the 3D preview
+msgid "Drag to turn"
+msgstr ""
+
+#. how to move the camera of the 3D preview
+msgid "Scroll to zoom"
 msgstr ""

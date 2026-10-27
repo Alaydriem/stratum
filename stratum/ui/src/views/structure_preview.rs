@@ -1,10 +1,12 @@
 use std::sync::Arc;
 
-use egui::{Align2, ColorImage, Event, Rect, Sense, TextureHandle, TextureOptions, Ui, Vec2, pos2, vec2};
-use levi_i18n::text::{Args, Text, UserText};
+use egui::{Align2, Color32, ColorImage, Event, Rect, Sense, TextureHandle, TextureOptions, Ui, Vec2, pos2, vec2};
+use levi_i18n::text::{Args, Text};
 use levi_ui::draw::{Corner, Draw, TextFit, TextStyle, TypeSize};
 use levi_ui::font::FontFace;
+use levi_ui::text::UiText;
 use levi_ui::tokens::{ColorToken, color};
+use levi_ui::widget::MetaSeparator;
 use stratum_core::services::preview::{PreviewRasterizer, PreviewService};
 use stratum_core::structs::library::StructureId;
 use stratum_core::structs::preview::{OrbitCamera, PreviewImage, PreviewRequest};
@@ -12,11 +14,15 @@ use stratum_core::structs::snapshot::StructureRow;
 
 use crate::message::StratumMessage;
 
-// The 3D preview of one structure: the picture the preview thread drew, turned by dragging in the pane. A new
+// The 3D preview of one structure: the picture the preview thread drew, turned by dragging and zoomed with the
+// wheel in the pane. The last render time shows in a pill at the top right, the hint at the bottom left. A new
 // picture is asked for only when the structure, the turn, the zoom or the pane size changes.
 pub struct StructurePreview {
     service: Arc<PreviewService>,
     texture: Option<TextureHandle>,
+    // The pixels last handed to the texture. egui lets go of its copy once the picture is uploaded; the next
+    // picture is then written into it, so a steady drag allocates no new image.
+    image: Option<Arc<ColorImage>>,
     // The structure the texture shows.
     shown: Option<StructureId>,
     camera: OrbitCamera,
@@ -31,11 +37,18 @@ pub struct StructurePreview {
 }
 
 impl StructurePreview {
-    /// spike: no Paper sheet yet. The pane's height.
-    const HEIGHT: f32 = 320.0;
-    /// spike: no Paper sheet yet. The room between the render time and the pane's bottom right corner.
-    const TIME_INSET: Vec2 = vec2(8.0, 6.0);
-    /// spike: no Paper sheet yet. Degrees the camera turns per point of drag.
+    /// Paper: Stratum, `Stratum · 20 Library · 3D preview`, node "Render time": `right` 10 px and `top` 10 px, the
+    /// room between the pill and the pane's top right corner.
+    const PILL_INSET: Vec2 = vec2(10.0, 10.0);
+    /// Paper: Stratum, `Stratum · 20 Library · 3D preview`, node "Render time": its padding, 8 px at the sides and
+    /// 2 px above and below.
+    const PILL_PADDING: Vec2 = vec2(8.0, 2.0);
+    /// Paper: Stratum, `Stratum · 20 Library · 3D preview`, node "Hint": `left` 12 px and `bottom` 10 px, the room
+    /// between the hint and the pane's bottom left corner.
+    const HINT_INSET: Vec2 = vec2(12.0, 10.0);
+    /// Paper: Stratum, `Stratum · 20 Library · 3D preview`, node "Hint": the `gap` between its parts, 6 px.
+    const HINT_GAP: f32 = 6.0;
+    /// Degrees the camera turns per point of drag.
     const DEGREES_PER_POINT: f32 = 0.5;
     const TIME: TextStyle = TextStyle::new(TypeSize::Caption, FontFace::Regular);
     const NOTE: TextStyle = TextStyle::new(TypeSize::Label, FontFace::Regular);
@@ -44,6 +57,7 @@ impl StructurePreview {
         Self {
             service,
             texture: None,
+            image: None,
             shown: None,
             camera: OrbitCamera::start(),
             framed: None,
@@ -55,8 +69,14 @@ impl StructurePreview {
         }
     }
 
-    pub fn show(&mut self, ui: &mut Ui, row: &StructureRow) {
-        let (rect, response) = ui.allocate_exact_size(vec2(ui.available_width(), Self::HEIGHT), Sense::drag());
+    // The turn and zoom the pane shows now.
+    pub fn camera(&self) -> OrbitCamera {
+        self.camera
+    }
+
+    // Draws the pane `height` points high across the width it is given.
+    pub fn show(&mut self, ui: &mut Ui, row: &StructureRow, height: f32) {
+        let (rect, response) = ui.allocate_exact_size(vec2(ui.available_width(), height), Sense::drag());
         if self.framed != Some(row.id) {
             self.framed = Some(row.id);
             self.camera = OrbitCamera::start();
@@ -138,14 +158,24 @@ impl StructurePreview {
         let Some(frame) = self.service.take() else {
             return;
         };
+        if frame.serial > self.serial {
+            if let Ok(image) = frame.outcome {
+                self.service.give_back(image.rgba);
+            }
+            return;
+        }
         self.answered = self.answered.max(frame.serial);
         if frame.structure != structure {
+            if let Ok(image) = frame.outcome {
+                self.service.give_back(image.rgba);
+            }
             return;
         }
         match frame.outcome {
             Ok(image) => {
                 self.render_us = Some(image.stats.render_us);
                 self.upload(ui, &image);
+                self.service.give_back(image.rgba);
                 self.shown = Some(structure);
                 self.failed = None;
             }
@@ -154,20 +184,27 @@ impl StructurePreview {
     }
 
     fn upload(&mut self, ui: &Ui, image: &PreviewImage) {
-        let pixels = ColorImage::from_rgba_unmultiplied([image.width as usize, image.height as usize], &image.rgba);
-        Self::set_texture(ui, &mut self.texture, "stratum-preview", pixels);
-    }
-
-    fn set_texture(ui: &Ui, texture: &mut Option<TextureHandle>, name: &str, pixels: ColorImage) {
-        match texture {
+        let size = [image.width as usize, image.height as usize];
+        match self.image.as_mut().and_then(Arc::get_mut) {
+            Some(pixels) if pixels.size == size => {
+                for (out, texel) in pixels.pixels.iter_mut().zip(image.rgba.as_chunks::<4>().0) {
+                    *out = Color32::from_rgba_unmultiplied(texel[0], texel[1], texel[2], texel[3]);
+                }
+            }
+            _ => self.image = Some(Arc::new(ColorImage::from_rgba_unmultiplied(size, &image.rgba))),
+        }
+        let Some(pixels) = self.image.as_ref().map(Arc::clone) else {
+            return;
+        };
+        match &mut self.texture {
             Some(texture) => texture.set(pixels, TextureOptions::LINEAR),
-            None => *texture = Some(ui.ctx().load_texture(name, pixels, TextureOptions::LINEAR)),
+            None => self.texture = Some(ui.ctx().load_texture("stratum-preview", pixels, TextureOptions::LINEAR)),
         }
     }
 
     fn paint(&self, ui: &Ui, rect: Rect, structure: StructureId) {
         let texture = self.texture.as_ref().filter(|_| self.shown == Some(structure));
-        let painter = ui.painter();
+        let painter = &ui.painter().with_clip_rect(rect.intersect(ui.clip_rect()));
         Draw::fill(painter, rect, Corner::Control, <color::BgField as ColorToken>::VALUE);
         Draw::stroke(painter, rect, Corner::Control, <color::Line as ColorToken>::VALUE);
         let faint = <color::TextFaint as ColorToken>::VALUE;
@@ -187,10 +224,35 @@ impl StructurePreview {
             }
         }
         if let Some(render_us) = self.render_us {
-            let ms = UserText::from_model(format!("{:.1}", render_us as f64 / 1000.0));
-            let text = Text::format(StratumMessage::PreviewRenderTime, Args::new().user("ms", ms));
-            let at = rect.right_bottom() - Self::TIME_INSET;
-            Draw::text(painter, at, Align2::RIGHT_BOTTOM, &text, Self::TIME, faint, TextFit::Line);
+            Self::paint_time(painter, rect, render_us);
         }
+        Self::paint_hint(painter, rect);
+    }
+
+    // The render time in a pill at the top right.
+    fn paint_time(painter: &egui::Painter, rect: Rect, render_us: u64) {
+        let faint = <color::TextFaint as ColorToken>::VALUE;
+        let args = Args::new().float("ms", render_us as f64 / 1000.0, 1);
+        let text = Text::format(StratumMessage::PreviewRenderTime, args);
+        let text = UiText::resolve(painter.ctx(), &text);
+        let galley = Draw::galley(painter, &text, Self::TIME, faint, TextFit::Line);
+        let size = galley.size() + Self::PILL_PADDING * 2.0;
+        let top_right = pos2(rect.right() - Self::PILL_INSET.x, rect.top() + Self::PILL_INSET.y);
+        let pill = Rect::from_min_size(pos2(top_right.x - size.x, top_right.y), size);
+        Draw::fill(painter, pill, Corner::Small, <color::Pill as ColorToken>::VALUE);
+        painter.galley(pill.min + Self::PILL_PADDING, galley, faint);
+    }
+
+    // "Drag to turn", a drawn dot, then "Scroll to zoom", at the bottom left.
+    fn paint_hint(painter: &egui::Painter, rect: Rect) {
+        let faint = <color::TextFaint as ColorToken>::VALUE;
+        let centre = rect.bottom() - Self::HINT_INSET.y - TypeSize::Caption.line_height() / 2.0;
+        let drag = Text::message(StratumMessage::PreviewHintDrag);
+        let at = pos2(rect.left() + Self::HINT_INSET.x, centre);
+        let drag = Draw::text(painter, at, Align2::LEFT_CENTER, &drag, Self::TIME, faint, TextFit::Line);
+        MetaSeparator::paint(painter, pos2(drag.right() + Self::HINT_GAP + MetaSeparator::SIDE / 2.0, centre));
+        let zoom = Text::message(StratumMessage::PreviewHintZoom);
+        let at = pos2(drag.right() + 2.0 * Self::HINT_GAP + MetaSeparator::SIDE, centre);
+        Draw::text(painter, at, Align2::LEFT_CENTER, &zoom, Self::TIME, faint, TextFit::Line);
     }
 }

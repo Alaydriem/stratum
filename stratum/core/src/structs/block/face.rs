@@ -1,4 +1,5 @@
-// One face of a block.
+// One face of a block. North is -Z, West is -X, Down is -Y, as in the game. The variants are in the game's
+// facing order, and `index` is the position in that order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Face {
     Down,
@@ -10,10 +11,15 @@ pub enum Face {
 }
 
 impl Face {
-    // Every face, in the order `SpotWorld::against` uses.
+    // Every face, in the order of `index`.
     pub const ALL: [Face; 6] = [Face::Down, Face::Up, Face::North, Face::South, Face::West, Face::East];
 
-    // The step from a block to its neighbour on this face. North is -Z, West is -X, Down is -Y.
+    // The position of this face in `ALL`.
+    pub fn index(self) -> usize {
+        self as usize
+    }
+
+    // The step from a block to its neighbour on this face.
     pub fn normal(self) -> [i32; 3] {
         match self {
             Self::Down => [0, -1, 0],
@@ -33,6 +39,18 @@ impl Face {
             Self::South => Self::North,
             Self::West => Self::East,
             Self::East => Self::West,
+        }
+    }
+
+    // The key the game's `blocks.json` uses for this face.
+    pub fn json_key(self) -> &'static str {
+        match self {
+            Self::Down => "down",
+            Self::Up => "up",
+            Self::North => "north",
+            Self::South => "south",
+            Self::West => "west",
+            Self::East => "east",
         }
     }
 }

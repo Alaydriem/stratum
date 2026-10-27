@@ -13,6 +13,8 @@ pub struct LibrarySnapshot {
     pub all_count: usize,
     pub markers: Vec<MarkerRow>,
     pub in_world: bool,
+    // True when the game has a local player body; placing a marker needs one.
+    pub has_player: bool,
     // One entry per big build project, rebuilt from scratch on each library change.
     pub layouts: Vec<(ProjectId, Result<BigBuildLayout, LayoutIssue>)>,
     pub materials: Option<(MaterialScope, MaterialList)>,
@@ -41,6 +43,7 @@ impl LibrarySnapshot {
             all_count: 0,
             markers: Vec::new(),
             in_world: false,
+            has_player: false,
             layouts: Vec::new(),
             materials: None,
             materials_loading: None,

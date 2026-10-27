@@ -10,3 +10,4 @@ mod project_page;
 mod sidebar_view;
 mod size_box;
 mod structure_list_page;
+mod structure_preview;

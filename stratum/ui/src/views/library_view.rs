@@ -43,13 +43,9 @@ impl LibraryView {
     /// Paper: Stratum, `Stratum · 01 Library`, node "Detail": the padding at the bottom.
     const DETAIL_PAD_BOTTOM: f32 = 24.0;
 
-    pub fn new() -> Self {
-        Self { sidebar: SidebarView::new(), detail: DetailView::new() }
-    }
-
-    // A menu whose structure card shows the 3D preview the service draws.
-    pub fn with_preview(service: Arc<PreviewService>) -> Self {
-        Self { sidebar: SidebarView::new(), detail: DetailView::with_preview(service) }
+    // With a `preview` service the structure card shows the 3D preview it draws; with None, the size box.
+    pub fn new(preview: Option<Arc<PreviewService>>) -> Self {
+        Self { sidebar: SidebarView::new(), detail: DetailView::new(preview) }
     }
 
     // Draws the menu over the screen and returns the panel's rect, for the host's input layer.
@@ -151,11 +147,5 @@ impl LibraryView {
 
     fn count(message: StratumMessage, count: usize) -> Text {
         Text::plural(message, u64::try_from(count).unwrap_or(u64::MAX), Args::new())
-    }
-}
-
-impl Default for LibraryView {
-    fn default() -> Self {
-        Self::new()
     }
 }

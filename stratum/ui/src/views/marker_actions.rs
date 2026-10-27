@@ -6,12 +6,13 @@ use levi_ui::tokens::{SpacingToken, spacing};
 use levi_ui::widget::{
     Banner, BannerTone, ButtonKind, Caption, IconButton, Leading, Menu, MenuItem, MenuTone, TextButton,
 };
-use stratum_core::structs::library::StructureId;
+use stratum_core::structs::action::LibraryAction;
 use stratum_core::structs::marker::{MarkerId, MarkerTarget, TargetState};
 use stratum_core::structs::snapshot::LibrarySnapshot;
 
-use super::dialogs::{AssignDialog, AssignSubject, DeleteDialog, PlaceMarkerDialog, RenameDialog};
+use super::dialogs::{AssignDialog, AssignSubject, DeleteDialog, RenameDialog};
 use crate::message::StratumMessage;
+use crate::presenter::ItemNames;
 use crate::state::{Dialog, DialogItem, LibraryUiState};
 
 // What the user can do with markers: place one for a structure or project, assign one, and deal with a marker that
@@ -20,18 +21,20 @@ pub struct MarkerActions;
 
 impl MarkerActions {
     // The footer row of a page: "Assign to marker…" and "Place marker here" from the left. `blocked` is a reason both
-    // buttons wait for, such as pieces that are not placed yet; it also shows after them.
+    // buttons wait for, such as pieces that are not placed yet; it also shows after them. Returns the action of Place
+    // marker here when it was clicked.
     pub fn show(
         ui: &mut Ui,
         snapshot: &LibrarySnapshot,
         target: MarkerTarget,
         blocked: Option<Text>,
         state: &mut LibraryUiState,
-    ) {
+    ) -> Option<LibraryAction> {
         let hint = blocked.clone();
-        let place_reason = Self::place_reason(snapshot, blocked.clone());
+        let place_reason = Self::place_reason(snapshot, target, blocked.clone());
         let assign_reason = Self::assign_reason(snapshot, blocked);
         let size = vec2(ui.available_width(), <spacing::Button as SpacingToken>::VALUE);
+        let mut placed = None;
         ui.allocate_ui_with_layout(size, Layout::left_to_right(Align::Center), |ui| {
             ui.spacing_mut().item_spacing.x = <spacing::M as SpacingToken>::VALUE;
             let mut assign = TextButton::new(ButtonKind::Secondary, Text::message(StratumMessage::AssignToMarker));
@@ -47,12 +50,13 @@ impl MarkerActions {
                 place = place.enabled(false, DisabledReason::new(reason));
             }
             if place.show(ui).clicked() {
-                Self::open_place_target(state, target);
+                placed = Self::place(snapshot, target);
             }
             if let Some(hint) = hint {
                 Caption::new(hint).show(ui);
             }
         });
+        placed
     }
 
     // A warning for a marker whose structure or project is gone, with a way to assign it a new one. Two or more such
@@ -112,23 +116,23 @@ impl MarkerActions {
         });
     }
 
-    // The trailing button of a structure row: places a marker for the structure, off with the reason placing is off.
-    pub(crate) fn row_action(snapshot: &LibrarySnapshot) -> IconButton {
+    // The trailing button of a structure row: places a marker for `target`, off with the reason placing is off.
+    pub(crate) fn row_action(snapshot: &LibrarySnapshot, target: MarkerTarget) -> IconButton {
         let button = IconButton::new(Icon::Pin).tooltip(Text::message(StratumMessage::PlaceMarkerHere));
-        match Self::place_reason(snapshot, None) {
+        match Self::place_reason(snapshot, target, None) {
             Some(reason) => button.enabled(false, DisabledReason::new(reason)),
             None => button,
         }
     }
 
-    // Opens the dialog that places a marker for `id`.
-    pub(crate) fn open_place(state: &mut LibraryUiState, id: StructureId) {
-        Self::open_place_target(state, MarkerTarget::Structure(id));
-    }
-
-    // Opens the dialog that places a marker for `target`.
-    pub(crate) fn open_place_target(state: &mut LibraryUiState, target: MarkerTarget) {
-        state.dialog = Some(Dialog::PlaceMarker(PlaceMarkerDialog::new(target)));
+    // The action that places a marker for `target` at the player's feet, named after the target. None when placing
+    // is off.
+    pub(crate) fn place(snapshot: &LibrarySnapshot, target: MarkerTarget) -> Option<LibraryAction> {
+        if Self::place_reason(snapshot, target, None).is_some() {
+            return None;
+        }
+        let name = ItemNames::target(snapshot, target)?.to_owned();
+        Some(LibraryAction::PlaceMarker { name, target })
     }
 
     // Opens the dialog that assigns a marker to `target`.
@@ -136,14 +140,20 @@ impl MarkerActions {
         state.dialog = Some(Dialog::Assign(AssignDialog::new(AssignSubject::Target(target))));
     }
 
-    // Why placing a marker is off, or None when it is on. `blocked` is a reason that holds both buttons.
-    pub(crate) fn place_reason(snapshot: &LibrarySnapshot, blocked: Option<Text>) -> Option<Text> {
+    // Why placing a marker for `target` is off, or None when it is on. `blocked` is a reason that holds both buttons.
+    pub(crate) fn place_reason(
+        snapshot: &LibrarySnapshot,
+        target: MarkerTarget,
+        blocked: Option<Text>,
+    ) -> Option<Text> {
         if blocked.is_some() {
             blocked
-        } else if !snapshot.in_world {
+        } else if !snapshot.in_world || !snapshot.has_player {
             Some(Text::message(StratumMessage::NotInWorldReason))
         } else if snapshot.markers_read_only {
             Some(Text::message(StratumMessage::MarkersReadOnlyTitle))
+        } else if ItemNames::target(snapshot, target).is_none() {
+            Some(Text::message(StratumMessage::ReasonNotFound))
         } else {
             None
         }
