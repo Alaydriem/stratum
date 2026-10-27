@@ -156,6 +156,22 @@ fn toggle_shown_keeps_every_other_setting() {
 }
 
 #[test]
+fn toggle_easy_place_flips_only_that_switch() {
+    let mut marker = Scene::marker();
+    marker.view.opacity_step = 5;
+    let mut expected = marker.clone();
+    assert!(!marker.view.easy_place);
+
+    Scene::press(&mut marker, HudAction::ToggleEasyPlace, 3);
+    expected.view.easy_place = true;
+    assert_eq!(marker, expected);
+
+    Scene::press(&mut marker, HudAction::ToggleEasyPlace, 3);
+    expected.view.easy_place = false;
+    assert_eq!(marker, expected);
+}
+
+#[test]
 fn structure_next_wraps_within_the_project() {
     let mut marker = Scene::marker();
     let mut seen = Vec::new();

@@ -1,4 +1,6 @@
+use crate::structs::easy_place::EasyPlaceNotice;
 use crate::structs::marker::Rotation;
+use crate::structs::material::ItemId;
 
 // What the HUD card shows for the active marker. Built by the tick, never by a frame.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -25,4 +27,10 @@ pub struct HudRow {
     pub rotation: Rotation,
     // The Structure control has structures to step through.
     pub has_structures: bool,
+    // Easy place is on for the marker.
+    pub easy_place: bool,
+    // The latest easy place notice, kept for a few seconds after it was raised.
+    pub notice: Option<EasyPlaceNotice>,
+    // The item a missing-block notice asks for; None for any other notice.
+    pub notice_item: Option<ItemId>,
 }

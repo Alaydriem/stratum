@@ -261,8 +261,10 @@ fn the_take_carries_the_rotation_of_a_turned_marker() {
     let (session, seen) = GhostScene::start();
     assert_eq!(seen.rotation, 0);
 
-    // Full mode, Left from Layer wraps to Rotate, and Up turns the marker a quarter turn clockwise
+    // Full mode, Left from Layer wraps to Easy place and Left again reaches Rotate, and Up turns the
+    // marker a quarter turn clockwise
     FakeTable::push_event(Hud::press(ManagerSession::HUD_MODE_ACTION));
+    FakeTable::push_event(Hud::press(ManagerSession::HUD_LEFT_ACTION));
     FakeTable::push_event(Hud::press(ManagerSession::HUD_LEFT_ACTION));
     FakeTable::push_event(Hud::press(ManagerSession::HUD_UP_ACTION));
     let start = Instant::now();

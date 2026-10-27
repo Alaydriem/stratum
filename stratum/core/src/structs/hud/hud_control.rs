@@ -9,4 +9,5 @@ pub enum HudControl {
     MoveY,
     MoveZ,
     Rotate,
+    EasyPlace,
 }

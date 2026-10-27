@@ -54,6 +54,7 @@ fn full_mode_left_right_wrap_the_carousel() {
             HudControl::MoveY,
             HudControl::MoveZ,
             HudControl::Rotate,
+            HudControl::EasyPlace,
         ]
     );
     let mut s = full_at(HudControl::Layer);
@@ -64,13 +65,29 @@ fn full_mode_left_right_wrap_the_carousel() {
     HudInput::press(&mut s, HudKey::Right, true);
     assert_eq!(s.control, HudControl::Layer);
     HudInput::press(&mut s, HudKey::Left, true);
-    assert_eq!(s.control, HudControl::Rotate);
+    assert_eq!(s.control, HudControl::EasyPlace);
+}
+
+#[test]
+fn easy_place_follows_rotate_in_the_carousel() {
+    for has_structures in [true, false] {
+        let order = HudInput::controls(has_structures);
+        let rotate = order.iter().position(|control| *control == HudControl::Rotate).unwrap();
+        assert_eq!(order[rotate + 1], HudControl::EasyPlace);
+        assert_eq!(order.last(), Some(&HudControl::EasyPlace));
+
+        let mut s = full_at(HudControl::Rotate);
+        HudInput::press(&mut s, HudKey::Right, has_structures);
+        assert_eq!(s.control, HudControl::EasyPlace);
+        HudInput::press(&mut s, HudKey::Left, has_structures);
+        assert_eq!(s.control, HudControl::Rotate);
+    }
 }
 
 #[test]
 fn structure_is_skipped_without_structures() {
     let order = HudInput::controls(false);
-    assert_eq!(order.len(), 7);
+    assert_eq!(order.len(), 8);
     assert!(!order.contains(&HudControl::Structure));
 
     let mut s = full_at(HudControl::Show);
@@ -102,6 +119,7 @@ fn full_mode_up_down_act_on_the_current_control() {
         (HudControl::MoveY, HudAction::Move(Axis::Y, 1), HudAction::Move(Axis::Y, -1)),
         (HudControl::MoveZ, HudAction::Move(Axis::Z, 1), HudAction::Move(Axis::Z, -1)),
         (HudControl::Rotate, HudAction::Rotate(1), HudAction::Rotate(-1)),
+        (HudControl::EasyPlace, HudAction::ToggleEasyPlace, HudAction::ToggleEasyPlace),
     ];
     for (control, up, down) in cases {
         let mut s = full_at(control);

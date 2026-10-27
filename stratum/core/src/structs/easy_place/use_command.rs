@@ -1,7 +1,7 @@
 use super::Placement;
 
 // What the shim does with the use call.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UseCommand {
     // Let the game handle the use.
     Vanilla,

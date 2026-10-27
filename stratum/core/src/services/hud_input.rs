@@ -6,7 +6,7 @@ use crate::structs::marker::Axis;
 pub struct HudInput;
 
 impl HudInput {
-    const ALL: [HudControl; 8] = [
+    const ALL: [HudControl; 9] = [
         HudControl::Layer,
         HudControl::Opacity,
         HudControl::Show,
@@ -15,9 +15,10 @@ impl HudInput {
         HudControl::MoveY,
         HudControl::MoveZ,
         HudControl::Rotate,
+        HudControl::EasyPlace,
     ];
 
-    const WITHOUT_STRUCTURE: [HudControl; 7] = [
+    const WITHOUT_STRUCTURE: [HudControl; 8] = [
         HudControl::Layer,
         HudControl::Opacity,
         HudControl::Show,
@@ -25,6 +26,7 @@ impl HudInput {
         HudControl::MoveY,
         HudControl::MoveZ,
         HudControl::Rotate,
+        HudControl::EasyPlace,
     ];
 
     // The carousel order. Structure is left out when no structure exists.
@@ -94,6 +96,7 @@ impl HudInput {
             HudControl::MoveY => HudAction::Move(Axis::Y, sign),
             HudControl::MoveZ => HudAction::Move(Axis::Z, sign),
             HudControl::Rotate => HudAction::Rotate(sign),
+            HudControl::EasyPlace => HudAction::ToggleEasyPlace,
         }
     }
 }

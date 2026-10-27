@@ -1,5 +1,7 @@
 mod atomic_file;
+mod easy_place_service;
 mod ghost_assembler;
+mod ghost_ray;
 mod ghost_scheduler;
 mod ghost_sections;
 mod ghost_service;
@@ -16,6 +18,7 @@ mod marker_store;
 mod material_counter;
 mod materials_worker;
 mod nbt_reader;
+mod place_needs;
 mod section_scan;
 mod store_writer;
 mod stratum_controller;

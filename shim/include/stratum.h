@@ -22,6 +22,49 @@ typedef enum StGhostJobMode {
 
 typedef struct StHandle StHandle;
 
+typedef struct StUseProbe {
+  double time_seconds;
+  bool pressed;
+  bool held;
+  double eye[3];
+  double dir[3];
+  double reach;
+  uint8_t game_mode;
+  bool has_hit;
+  int32_t hit_cell[3];
+  uint8_t hit_face;
+  double hit_distance;
+  bool hit_replaceable;
+  uint8_t swap_answer;
+} StUseProbe;
+
+typedef struct StSpotWorld {
+  bool against[6];
+} StSpotWorld;
+
+typedef struct StStr {
+  const uint8_t *ptr;
+  uintptr_t len;
+} StStr;
+
+typedef struct StInventorySlot {
+  struct StStr item;
+  uint32_t count;
+} StInventorySlot;
+#define StInventorySlot_CAPACITY 36
+
+typedef struct StUseCommand {
+  uint8_t kind;
+  uint8_t slot;
+  uint8_t from;
+  uint8_t to;
+  uint16_t palette_id;
+  int32_t spot[3];
+  int32_t neighbour[3];
+  uint8_t face;
+  float click[3];
+} StUseCommand;
+
 typedef struct StGhostDraw {
   uint32_t slot;
   int32_t origin[3];
@@ -104,11 +147,6 @@ typedef struct StGhostReport {
   bool world_reset;
 } StGhostReport;
 
-typedef struct StStr {
-  const uint8_t *ptr;
-  uintptr_t len;
-} StStr;
-
 typedef struct StFrameStatus {
   bool in_world;
   bool has_player;
@@ -125,6 +163,55 @@ typedef struct StFrameStatus {
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
+
+/**
+ * Step one of a use call, on the game thread, while the use key is down: asks for the ghost spot under the
+ * crosshair. Sets `*has_spot` and, only when it is true, writes the spot to `*spot_out`; then read the
+ * blocks around the spot and call st_use_decide with the same probe. `probe`, `spot_out` and `has_spot` are
+ * read or written during the call only. There is never a spot while the HUD keys are not live: no active
+ * marker, a game screen or the library open, or another mod holding Input. Returns InvalidArgument for a null
+ * pointer, and Failed after an earlier panic.
+ */
+enum StStatus st_use_aim(struct StHandle *handle,
+                         const struct StUseProbe *probe,
+                         int32_t (*spot_out)[3],
+                         bool *has_spot);
+
+/**
+ * Step two of a use call, on the game thread: asks what to do with this use. `probe` is the one given to
+ * st_use_aim. `world` is null when st_use_aim gave no spot, otherwise what surrounds that spot. `slots` points
+ * to `count` inventory slots, at most 36, slots 0 to 8 being the hotbar, and `selected` is the selected slot.
+ * Every pointer, including each slot's item name, is read during the call only; `out` is written during the
+ * call. Gives kind 0 (vanilla) while the HUD keys are not live. Returns InvalidArgument for a null handle,
+ * probe, slots with a count, or out, a count above 36 or an item view that is null with a length, and Failed
+ * after an earlier panic.
+ */
+enum StStatus st_use_decide(struct StHandle *handle,
+                            const struct StUseProbe *probe,
+                            const struct StSpotWorld *world,
+                            const struct StInventorySlot *slots,
+                            uint32_t count,
+                            uint8_t selected,
+                            struct StUseCommand *out);
+
+/**
+ * The use key went up. Ends the hold: the spots tried in it are forgotten. Call it on the game thread. Returns
+ * InvalidArgument for a null handle, and Failed after an earlier panic.
+ */
+enum StStatus st_use_released(struct StHandle *handle);
+
+/**
+ * The block at (x, y, z) is `name` now, as the game reports it; the placements that wait for the server are
+ * checked against it. Call it on the game thread for each block change. `name` is read during the call only.
+ * `time_seconds` is the frame clock. Returns InvalidArgument for a null handle or a name view that is null with
+ * a length, and Failed after an earlier panic.
+ */
+enum StStatus st_block_seen(struct StHandle *handle,
+                            int32_t x,
+                            int32_t y,
+                            int32_t z,
+                            struct StStr name,
+                            double time_seconds);
 
 /**
  * Fills `out` with this render frame's ghost work: drop every mesh and block lookup when `world_epoch` changed, and hold none while `in_world` is false,

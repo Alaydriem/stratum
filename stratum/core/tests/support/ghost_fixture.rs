@@ -37,6 +37,17 @@ impl GhostFixture {
         })
     }
 
+    // A 1 x 1 x 1 structure holding one block with its states.
+    pub fn stateful(block: BlockState) -> Arc<Structure> {
+        Arc::new(Structure {
+            size: StructureSize::new(1, 1, 1),
+            world_origin: None,
+            palette: vec![block],
+            primary: BlockLayer::new(vec![0]),
+            secondary: SparseLayer::default(),
+        })
+    }
+
     // A 1 x 1 x `count` structure of `count` different blocks.
     pub fn distinct(count: usize) -> Arc<Structure> {
         let palette: Vec<BlockState> =

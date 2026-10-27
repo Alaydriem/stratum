@@ -4,3 +4,4 @@ mod api;
 mod descriptor;
 mod services;
 mod support;
+mod types;

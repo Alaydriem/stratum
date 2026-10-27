@@ -212,6 +212,12 @@ pub enum StratumMessage {
     HudChoose,
     HudChange,
     HudQuick,
+    HudEasyPlace,
+    HudEasyPlaceOffChip,
+    HudEasyPlaceOn,
+    HudEasyPlaceOff,
+    EasyPlaceMissing,
+    EasyPlaceNoNeighbour,
 }
 
 impl Message for StratumMessage {
@@ -415,6 +421,12 @@ impl Message for StratumMessage {
         Self::HudChoose,
         Self::HudChange,
         Self::HudQuick,
+        Self::HudEasyPlace,
+        Self::HudEasyPlaceOffChip,
+        Self::HudEasyPlaceOn,
+        Self::HudEasyPlaceOff,
+        Self::EasyPlaceMissing,
+        Self::EasyPlaceNoNeighbour,
     ];
 
     fn index(self) -> usize {
@@ -637,6 +649,12 @@ impl Message for StratumMessage {
             Self::HudChoose => "Choose",
             Self::HudChange => "Change",
             Self::HudQuick => "Quick",
+            Self::HudEasyPlace => "Easy place",
+            Self::HudEasyPlaceOffChip => "Easy place off",
+            Self::HudEasyPlaceOn => "On",
+            Self::HudEasyPlaceOff => "Off",
+            Self::EasyPlaceMissing => "No {block} in your inventory",
+            Self::EasyPlaceNoNeighbour => "Nothing to place this block against",
         }
     }
 
@@ -676,6 +694,8 @@ impl Message for StratumMessage {
             Self::HudChooseKeys => Some("the left and right arrow keys"),
             Self::HudChangeKeys => Some("the up and down arrow keys"),
             Self::HudLetterX | Self::HudLetterY | Self::HudLetterZ => Some("a world axis"),
+            Self::HudEasyPlaceOn | Self::HudEasyPlaceOff => Some("the state of the easy place switch"),
+            Self::EasyPlaceMissing => Some("{block} is the readable name of the item the build needs"),
             _ => None,
         }
     }

@@ -2027,3 +2027,238 @@ fn ghost_telemetry_reports_miniature_slots() {
     assert!(telemetry.used_bytes > telemetry.miniature_bytes);
     assert!(!telemetry.miniature_over_limit);
 }
+
+use stratum_core::services::EasyPlaceService;
+use stratum_core::structs::easy_place::{
+    EasyPlaceNotice, GameMode, InventorySlot, SpotWorld, SwapAnswer, UseCommand, UseProbe,
+};
+use stratum_core::structs::material::ItemId;
+
+// Steps for the easy place tests that go through `StratumController`: a flat build of stone cells
+// along x from (0, 64, 0), seen from above.
+struct UseScene;
+
+impl UseScene {
+    const DEADLINE: Duration = Duration::from_secs(60);
+    const STONE: &'static [u8] = b"minecraft:stone";
+
+    // A controller with a 3 by 1 by 1 stone ghost whose build is made.
+    fn start(data: &std::path::Path) -> StratumController {
+        let mut controller = GhostScene::start(data, StratumConfig::default(), [3, 1, 1]);
+        GhostScene::tick_until_jobs(&mut controller, 2.0);
+        controller
+    }
+
+    fn enable(controller: &mut StratumController) {
+        controller.apply_hud(HudAction::ToggleEasyPlace);
+        controller.tick(&Frames::in_world(GhostScene::WORLD, 2.0));
+    }
+
+    // Looks straight down at the cell column (x, z) from above the build.
+    fn above(x: i32, z: i32) -> UseProbe {
+        UseProbe {
+            time_seconds: 2.0,
+            pressed: false,
+            held: true,
+            eye: [f64::from(x) + 0.5, 70.5, f64::from(z) + 0.5],
+            dir: [0.0, -1.0, 0.0],
+            reach: 20.0,
+            game_mode: GameMode::Survival,
+            hit: None,
+            swap_answer: SwapAnswer::None,
+        }
+    }
+
+    // Looks away from the build.
+    fn away() -> UseProbe {
+        UseProbe { dir: [0.0, 1.0, 0.0], ..Self::above(0, 0) }
+    }
+
+    fn stone_in_hand() -> Vec<InventorySlot<'static>> {
+        vec![InventorySlot { item: Self::STONE, count: 1 }]
+    }
+
+    fn closed_in() -> SpotWorld {
+        SpotWorld { against: [true; 6] }
+    }
+
+    // Ticks until the aim at `probe` names a spot, and returns it.
+    fn aim_when_ready(controller: &mut StratumController, probe: &UseProbe) -> [i32; 3] {
+        let start = std::time::Instant::now();
+        loop {
+            controller.tick(&Frames::in_world(GhostScene::WORLD, 2.0));
+            if let Some(spot) = controller.use_aim(probe) {
+                return spot;
+            }
+            assert!(start.elapsed() < Self::DEADLINE, "the ghost never gave a spot");
+            std::thread::sleep(Duration::from_millis(2));
+        }
+    }
+
+    // One full use call on the spot under `probe`, with every neighbour solid.
+    fn place(controller: &mut StratumController, probe: &UseProbe) -> UseCommand {
+        let spot = controller.use_aim(probe);
+        let world = spot.map(|_| Self::closed_in());
+        controller.use_decide(probe, world.as_ref(), &Self::stone_in_hand(), 0)
+    }
+}
+
+#[test]
+fn easy_place_off_is_vanilla() {
+    let data = tempfile::tempdir().unwrap();
+    let mut controller = UseScene::start(data.path());
+    controller.tick(&Frames::in_world(GhostScene::WORLD, 2.0));
+    let probe = UseScene::above(0, 0);
+
+    assert_eq!(controller.use_aim(&probe), None);
+    assert_eq!(controller.use_decide(&probe, None, &UseScene::stone_in_hand(), 0), UseCommand::Vanilla);
+
+    UseScene::enable(&mut controller);
+    assert_eq!(UseScene::aim_when_ready(&mut controller, &probe), [0, 64, 0]);
+}
+
+#[test]
+fn a_hidden_ghost_is_vanilla() {
+    let data = tempfile::tempdir().unwrap();
+    let mut controller = UseScene::start(data.path());
+    UseScene::enable(&mut controller);
+    let probe = UseScene::above(1, 0);
+    assert_eq!(UseScene::aim_when_ready(&mut controller, &probe), [1, 64, 0]);
+
+    controller.apply_hud(HudAction::ToggleShown);
+    controller.tick(&Frames::in_world(GhostScene::WORLD, 2.5));
+    assert_eq!(controller.use_aim(&probe), None);
+    assert_eq!(controller.use_decide(&probe, None, &UseScene::stone_in_hand(), 0), UseCommand::Vanilla);
+
+    controller.apply_hud(HudAction::ToggleShown);
+    controller.set_ghost_allowed(false);
+    controller.tick(&Frames::in_world(GhostScene::WORLD, 3.0));
+    assert_eq!(controller.use_aim(&probe), None);
+    assert_eq!(controller.use_decide(&probe, None, &UseScene::stone_in_hand(), 0), UseCommand::Vanilla);
+}
+
+#[test]
+fn a_turned_build_targets_the_turned_cell() {
+    let data = tempfile::tempdir().unwrap();
+    let mut controller = UseScene::start(data.path());
+    UseScene::enable(&mut controller);
+    let (corner, turned) = Rotation::R90.turn_box([0; 3], [3, 1, 1]);
+    let cell = [corner[0] as i32, 64, (corner[2] + i64::from(turned[2]) - 1) as i32];
+    assert_ne!(cell[2], 0, "the far cell of the turned row is off the unturned row");
+    let probe = UseScene::above(cell[0], cell[2]);
+    controller.tick(&Frames::in_world(GhostScene::WORLD, 2.0));
+    assert_eq!(controller.use_aim(&probe), None, "nothing stands there before the turn");
+
+    controller.apply_hud(HudAction::Rotate(1));
+
+    assert_eq!(UseScene::aim_when_ready(&mut controller, &probe), cell);
+}
+
+#[test]
+fn a_screen_opening_ends_the_hold() {
+    let data = tempfile::tempdir().unwrap();
+    let mut controller = UseScene::start(data.path());
+    UseScene::enable(&mut controller);
+    let probe = UseScene::above(0, 0);
+    UseScene::aim_when_ready(&mut controller, &probe);
+    let command = UseScene::place(&mut controller, &probe);
+    assert_ne!(command, UseCommand::Vanilla);
+    assert_eq!(controller.use_aim(&UseScene::away()), None);
+    let held = controller.use_decide(&UseScene::away(), None, &UseScene::stone_in_hand(), 0);
+    assert_eq!(held, UseCommand::Block, "a hold in progress blocks the vanilla use");
+
+    let screen = FrameStatus { menu_open: true, ..Frames::in_world(GhostScene::WORLD, 3.0) };
+    controller.tick(&screen);
+
+    assert_eq!(controller.use_aim(&UseScene::away()), None);
+    let after = controller.use_decide(&UseScene::away(), None, &UseScene::stone_in_hand(), 0);
+    assert_eq!(after, UseCommand::Vanilla);
+}
+
+#[test]
+fn use_released_ends_the_hold() {
+    let data = tempfile::tempdir().unwrap();
+    let mut controller = UseScene::start(data.path());
+    UseScene::enable(&mut controller);
+    let probe = UseScene::above(0, 0);
+    UseScene::aim_when_ready(&mut controller, &probe);
+    assert_ne!(UseScene::place(&mut controller, &probe), UseCommand::Vanilla);
+    assert_eq!(controller.easy_place_telemetry().placed, 1);
+
+    controller.use_released();
+
+    assert_eq!(controller.use_aim(&UseScene::away()), None);
+    assert_eq!(controller.use_decide(&UseScene::away(), None, &UseScene::stone_in_hand(), 0), UseCommand::Vanilla);
+}
+
+#[test]
+fn up_and_down_toggle_easy_place_and_save_it() {
+    let data = tempfile::tempdir().unwrap();
+    let mut controller = RowScene::structure_marker(data.path());
+    controller.hud_key(HudKey::Mode);
+    while controller.hud_state().control != HudControl::EasyPlace {
+        controller.hud_key(HudKey::Right);
+    }
+
+    controller.hud_key(HudKey::Up);
+    controller.tick(&Frames::in_world("W1", 1.2));
+    assert!(controller.snapshot().hud.clone().unwrap().easy_place);
+    let marker = HudScene::saved(controller, data.path());
+    assert!(marker.view.easy_place);
+
+    let mut controller = ControllerHarness::start(data.path());
+    controller.tick(&Frames::in_world("W1", 2.0));
+    assert!(controller.snapshot().hud.clone().unwrap().easy_place, "the switch is read back from the saved marker");
+    controller.hud_key(HudKey::Mode);
+    while controller.hud_state().control != HudControl::EasyPlace {
+        controller.hud_key(HudKey::Right);
+    }
+    controller.hud_key(HudKey::Down);
+    controller.tick(&Frames::in_world("W1", 2.2));
+    assert!(!controller.snapshot().hud.clone().unwrap().easy_place);
+    let marker = HudScene::saved(controller, data.path());
+    assert!(!marker.view.easy_place);
+}
+
+#[test]
+fn the_hud_row_shows_easy_place_and_the_notice_for_three_seconds() {
+    let data = tempfile::tempdir().unwrap();
+    let mut controller = UseScene::start(data.path());
+    let hud = controller.snapshot().hud.clone().unwrap();
+    assert_eq!((hud.easy_place, hud.notice), (false, None));
+    UseScene::enable(&mut controller);
+    assert!(controller.snapshot().hud.clone().unwrap().easy_place);
+    let probe = UseScene::above(0, 0);
+    UseScene::aim_when_ready(&mut controller, &probe);
+
+    let walled_off = SpotWorld { against: [false; 6] };
+    let command = controller.use_decide(&probe, Some(&walled_off), &UseScene::stone_in_hand(), 0);
+    assert_eq!(command, UseCommand::Block);
+
+    controller.tick(&Frames::in_world(GhostScene::WORLD, 2.0));
+    assert_eq!(controller.snapshot().hud.clone().unwrap().notice, Some(EasyPlaceNotice::NoNeighbour));
+    controller.tick(&Frames::in_world(GhostScene::WORLD, 4.9));
+    assert_eq!(controller.snapshot().hud.clone().unwrap().notice, Some(EasyPlaceNotice::NoNeighbour));
+    controller.tick(&Frames::in_world(GhostScene::WORLD, 2.0 + EasyPlaceService::NOTICE_SECONDS));
+    assert_eq!(controller.snapshot().hud.clone().unwrap().notice, None);
+}
+
+#[test]
+fn a_missing_block_notice_carries_the_needed_item_until_it_expires() {
+    let data = tempfile::tempdir().unwrap();
+    let mut controller = UseScene::start(data.path());
+    UseScene::enable(&mut controller);
+    let probe = UseScene::above(0, 0);
+    UseScene::aim_when_ready(&mut controller, &probe);
+
+    let command = controller.use_decide(&probe, Some(&UseScene::closed_in()), &[], 0);
+    assert_eq!(command, UseCommand::Block);
+
+    controller.tick(&Frames::in_world(GhostScene::WORLD, 2.0));
+    let hud = controller.snapshot().hud.clone().unwrap();
+    assert_eq!(hud.notice, Some(EasyPlaceNotice::Missing { palette_id: 0 }));
+    assert_eq!(hud.notice_item, Some(ItemId("minecraft:stone".to_owned())));
+    controller.tick(&Frames::in_world(GhostScene::WORLD, 2.0 + EasyPlaceService::NOTICE_SECONDS));
+    let hud = controller.snapshot().hud.clone().unwrap();
+    assert_eq!((hud.notice, hud.notice_item), (None, None));
+}

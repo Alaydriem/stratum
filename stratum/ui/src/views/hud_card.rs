@@ -11,6 +11,7 @@ use levi_ui::widget::{
     Carousel, CarouselItem, CarouselMark, Chip, ChipKind, ChipSize, ChipTone, KeyCap, KeyCapLabel, KeyCapSize,
 };
 use stratum_core::services::HudInput;
+use stratum_core::structs::easy_place::EasyPlaceNotice;
 use stratum_core::structs::hud::{HudControl, HudMode, HudState};
 use stratum_core::structs::marker::OpacityStep;
 use stratum_core::structs::snapshot::HudRow;
@@ -32,10 +33,12 @@ pub struct HudCard {
     big: Text,
     detail: Text,
     level: Option<Text>,
-    chips: [Chip; 3],
+    chips: [Chip; 4],
     // The chip rects relative to the chip section's top left.
-    chip_rects: [Rect; 3],
+    chip_rects: [Rect; 4],
     chips_height: f32,
+    // The easy place notice line; None while there is no notice to show.
+    notice: Option<Text>,
     items: Vec<CarouselItem>,
     current: usize,
     // The key cross: left, up, down and right.
@@ -81,6 +84,10 @@ impl HudCard {
     const CHIPS_BOTTOM: f32 = 12.0;
     /// Paper: Stratum, `Stratum · 16 HUD · quick mode`, status chips: the gap between chips and between rows.
     const CHIPS_GAP: f32 = 6.0;
+    /// Paper: Stratum, `Stratum · 19 HUD · easy place`, easy place notice: the padding above and under the row.
+    const NOTICE_PAD_Y: f32 = 10.0;
+    /// Paper: Stratum, `Stratum · 19 HUD · easy place`, easy place notice: the gap between the icon and the text.
+    const NOTICE_GAP: f32 = 10.0;
     /// Paper: Stratum, `Stratum · 16 HUD · quick mode`, keys: the padding above the section.
     const KEYS_TOP: f32 = 14.0;
     /// Paper: Stratum, `Stratum · 16 HUD · quick mode`, keys: the padding under the section.
@@ -122,9 +129,10 @@ impl HudCard {
             big: empty(),
             detail: empty(),
             level: None,
-            chips: [chip(), chip(), chip()],
-            chip_rects: [Rect::NOTHING; 3],
+            chips: [chip(), chip(), chip(), chip()],
+            chip_rects: [Rect::NOTHING; 4],
             chips_height: 0.0,
+            notice: None,
             items: Vec::with_capacity(HudInput::controls(true).len()),
             current: 0,
             caps: [arrow(Icon::ChevronLeft), arrow(Icon::ChevronUp), arrow(Icon::ChevronDown), arrow(Icon::Chevron)],
@@ -155,6 +163,7 @@ impl HudCard {
         let height = Self::header_height()
             + Self::readout_height()
             + self.chips_height
+            + self.notice_height()
             + match state.mode {
                 HudMode::Quick => Self::quick_height(),
                 HudMode::Full => self.full_height(),
@@ -173,6 +182,7 @@ impl HudCard {
         self.paint_chips(&painter, rect, top);
         top += self.chips_height;
         Self::divider(&painter, rect, top);
+        top = self.paint_notice(&painter, rect, top);
         match state.mode {
             HudMode::Quick => self.paint_quick(&painter, rect, top),
             HudMode::Full => self.paint_full(&painter, rect, top),
@@ -224,6 +234,15 @@ impl HudCard {
         let shown = if hud.shown { StratumMessage::HudShown } else { StratumMessage::HudHidden };
         let dot = if hud.shown { <color::Success as ColorToken>::VALUE } else { <color::TextDim as ColorToken>::VALUE };
         let chip = |text| Chip::new(ChipKind::Display(ChipTone::Neutral), text).size(ChipSize::Hud);
+        let easy_place = if hud.easy_place {
+            Chip::new(ChipKind::Display(ChipTone::Accent), Text::message(StratumMessage::HudEasyPlace))
+                .size(ChipSize::Hud)
+                .dot(<color::Accent as ColorToken>::VALUE)
+        } else {
+            chip(Text::message(StratumMessage::HudEasyPlaceOffChip))
+                .off(true)
+                .dot(<color::TextFaint as ColorToken>::VALUE)
+        };
         self.chips = [
             chip(Text::message(shown)).dot(dot),
             chip(Text::format(StratumMessage::HudOpacityChip, Self::opacity_args(hud))),
@@ -231,7 +250,16 @@ impl HudCard {
                 StratumMessage::HudOriginChip,
                 Args::new().int("x", x).int("y", y).int("z", z).uint("degrees", degrees),
             )),
+            easy_place,
         ];
+        self.notice = match (hud.notice, &hud.notice_item) {
+            (Some(EasyPlaceNotice::Missing { .. }), Some(item)) => Some(Text::format(
+                StratumMessage::EasyPlaceMissing,
+                Args::new().user("block", UserText::from_model(item.readable())),
+            )),
+            (Some(EasyPlaceNotice::NoNeighbour), _) => Some(Text::message(StratumMessage::EasyPlaceNoNeighbour)),
+            (Some(EasyPlaceNotice::Missing { .. }), None) | (None, _) => None,
+        };
         let controls = HudInput::carousel(state.control, hud.has_structures);
         self.items.clear();
         self.items.extend(controls.iter().map(|control| Self::item(*control, hud)));
@@ -319,6 +347,11 @@ impl HudCard {
                 StratumMessage::HudMoveZ,
                 origin(StratumMessage::HudOriginZ, 2),
             ),
+            HudControl::EasyPlace => {
+                let value =
+                    if hud.easy_place { StratumMessage::HudEasyPlaceOn } else { StratumMessage::HudEasyPlaceOff };
+                (CarouselMark::Icon(Icon::Add), StratumMessage::HudEasyPlace, Text::message(value))
+            }
             HudControl::Rotate => (
                 CarouselMark::Icon(Icon::Rotate),
                 StratumMessage::HudRotate,
@@ -337,6 +370,15 @@ impl HudCard {
 
     fn header_row() -> f32 {
         Self::ICON_LINE.max(Self::NAME.size.line_height() + Self::TEXT_GAP + Self::CAPTION.size.line_height())
+    }
+
+    // The height of the notice line; nothing while there is no notice.
+    fn notice_height(&self) -> f32 {
+        if self.notice.is_some() {
+            2.0 * Self::NOTICE_PAD_Y + Self::ICON_LINE.max(Self::NOTE.size.line_height())
+        } else {
+            0.0
+        }
     }
 
     fn readout_height() -> f32 {
@@ -410,6 +452,26 @@ impl HudCard {
         for (chip, slot) in self.chips.iter().zip(&self.chip_rects) {
             chip.paint(painter, slot.translate(origin), InteractionState::Rest);
         }
+    }
+
+    // Paints the easy place notice line from `top` and returns its bottom; `top` itself without a notice.
+    fn paint_notice(&self, painter: &Painter, rect: Rect, top: f32) -> f32 {
+        let Some(notice) = &self.notice else {
+            return top;
+        };
+        let height = self.notice_height();
+        let row = Rect::from_min_size(pos2(rect.left(), top), vec2(rect.width(), height));
+        Draw::fill(painter, row, Corner::None, <color::WarningSoft as ColorToken>::VALUE);
+        Self::divider(painter, rect, row.bottom());
+        let side = IconSize::Regular.points();
+        let centre = row.center().y;
+        let icon = Rect::from_center_size(pos2(row.left() + Self::PAD_X + side / 2.0, centre), Vec2::splat(side));
+        Icon::Warning.paint(painter, icon, IconSize::Regular, <color::Warning as ColorToken>::VALUE);
+        let left = icon.right() + Self::NOTICE_GAP;
+        let fit = TextFit::Truncate((row.right() - Self::PAD_X - left).max(0.0));
+        let text = <color::Text as ColorToken>::VALUE;
+        Draw::text(painter, pos2(left, centre), Align2::LEFT_CENTER, notice, Self::NOTE, text, fit);
+        row.bottom()
     }
 
     fn paint_quick(&self, painter: &Painter, rect: Rect, top: f32) {

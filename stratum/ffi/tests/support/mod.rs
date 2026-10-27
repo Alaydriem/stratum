@@ -1,3 +1,4 @@
+pub mod easy_place;
 pub mod ghost_scene;
 pub mod ghost_seen;
 pub mod hud;
@@ -6,6 +7,7 @@ pub mod markers;
 pub mod picker_guard;
 pub mod session;
 
+pub use easy_place::EasyPlace;
 pub use ghost_scene::GhostScene;
 pub use ghost_seen::GhostSeen;
 pub use hud::Hud;

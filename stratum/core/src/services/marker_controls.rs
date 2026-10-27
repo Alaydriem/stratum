@@ -19,6 +19,7 @@ impl MarkerControls {
                 *slot = slot.saturating_add(i32::from(direction.signum()));
             }
             HudAction::Rotate(quarters) => marker.rotation = marker.rotation.turned(quarters),
+            HudAction::ToggleEasyPlace => marker.view.easy_place = !marker.view.easy_place,
             HudAction::StructureNext => Self::step_structure(marker, structures, true),
             HudAction::StructurePrev => Self::step_structure(marker, structures, false),
         }

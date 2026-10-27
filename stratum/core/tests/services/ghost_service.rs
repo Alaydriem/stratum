@@ -1345,3 +1345,40 @@ fn miniature_telemetry_counts_groups_and_sections() {
     assert_eq!(rig.service.miniature_sections() as usize, Rig::full_keys(&keys).len());
     assert_eq!(rig.service.miniature_bytes(), 2 * 64);
 }
+
+#[test]
+fn no_target_while_a_move_settles() {
+    let mut rig = Rig::new();
+    let marker = Rig::marker(1, Rotation::R0);
+    let loaded = [(7, GhostFixture::structure([2, 3, 2], &["stone"; 12]))];
+    rig.update(Some(&marker), &[]);
+    assert!(rig.service.aim_view().is_none(), "no build yet");
+    rig.run_to_rest(&marker, &loaded);
+    let (build, view) = rig.service.aim_view().unwrap();
+    assert_eq!((build.world_min, view), ([0, 64, 0], stratum_core::structs::ghost::GhostView::Whole));
+
+    let moved = Marker { origin: [1, 64, 0], ..marker.clone() };
+    rig.update(Some(&moved), &loaded);
+    assert!(rig.service.aim_view().is_none(), "the build still sits at the old place");
+    rig.time += 0.1;
+    rig.update(Some(&moved), &loaded);
+    assert!(rig.service.aim_view().is_none());
+
+    rig.time += GhostService::MOVE_SETTLE_SECONDS;
+    rig.update(Some(&moved), &loaded);
+    let (build, _) = rig.service.aim_view().unwrap();
+    assert_eq!(build.world_min, [1, 64, 0]);
+}
+
+#[test]
+fn a_hidden_build_has_no_aim_view() {
+    let mut rig = Rig::new();
+    let marker = Rig::marker(1, Rotation::R0);
+    let loaded = [(7, GhostFixture::structure([2, 3, 2], &["stone"; 12]))];
+    rig.update(Some(&marker), &[]);
+    rig.run_to_rest(&marker, &loaded);
+    assert!(rig.service.aim_view().is_some());
+
+    rig.update_hidden(&marker, &loaded);
+    assert!(rig.service.aim_view().is_none());
+}

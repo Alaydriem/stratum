@@ -1,0 +1,112 @@
+name: Create Release
+
+# semantic-release reads the conventional commits since the last v* tag, picks
+# the next version, patches it in with .github/scripts/patch-versions.js,
+# commits CHANGELOG.md and the patched files, then pushes the tag and creates
+# the GitHub release.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (no actual release)'
+        required: false
+        default: false
+        type: boolean
+      draft:
+        description: 'Create as draft release'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+  packages: write
+  issues: write
+  pull-requests: write
+
+env:
+  NODE_VERSION: '25'
+
+jobs:
+  prepare-release:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    outputs:
+      new_release: ${{ steps.semantic.outputs.new_release_published }}
+      new_version: ${{ steps.semantic.outputs.new_release_version }}
+      new_tag: ${{ steps.semantic.outputs.new_release_git_tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Generate GitHub App token
+        id: generate-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Configure draft release
+        if: inputs.draft == true
+        run: |
+          node -e "
+            const fs = require('fs');
+            const config = JSON.parse(fs.readFileSync('.releaserc.json', 'utf8'));
+            config.plugins = config.plugins.map(plugin => {
+              if (Array.isArray(plugin) && plugin[0] === '@semantic-release/github') {
+                plugin[1] = { ...plugin[1], draftRelease: true };
+              } else if (plugin === '@semantic-release/github') {
+                return ['@semantic-release/github', { draftRelease: true }];
+              }
+              return plugin;
+            });
+            fs.writeFileSync('.releaserc.json', JSON.stringify(config, null, 2));
+            console.log('Updated .releaserc.json for draft release');
+          "
+
+      - name: Run semantic-release
+        id: semantic
+        uses: cycjimmy/semantic-release-action@v4
+        with:
+          dry_run: ${{ inputs.dry_run }}
+          extra_plugins: |
+            @semantic-release/changelog
+            @semantic-release/exec
+            @semantic-release/git
+        env:
+          GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
+
+      - name: Release summary
+        run: |
+          echo "## Semantic Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.semantic.outputs.new_release_published }}" = "true" ]; then
+            echo "New release: **v${{ steps.semantic.outputs.new_release_version }}**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Tag: \`${{ steps.semantic.outputs.new_release_git_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No new release needed based on commits." >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Dry run: ${{ inputs.dry_run }}" >> $GITHUB_STEP_SUMMARY
+          echo "Draft: ${{ inputs.draft }}" >> $GITHUB_STEP_SUMMARY
+
+  # The release commit carries [skip ci], so the tag semantic-release pushes
+  # does not start release.yml on its own. It is called here instead.
+  build-and-release:
+    name: Build & Release
+    needs: prepare-release
+    if: needs.prepare-release.outputs.new_release == 'true' && !inputs.dry_run
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.prepare-release.outputs.new_tag }}

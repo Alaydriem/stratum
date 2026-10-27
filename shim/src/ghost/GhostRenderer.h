@@ -39,6 +39,10 @@ public:
     // after LevelRenderer::renderLevel's own drawing: take, apply, draw, report
     static void afterRenderLevel(LevelRenderer& renderer, ScreenContext& screen, FrameRenderObject const& frame);
 
+    // the game block of palette id `id` in the world the ghost is drawn in; null outside a world or for an id that
+    // did not resolve. The client tick may call it, because the render and the tick run on the same thread
+    [[nodiscard]] static Block const* paletteBlock(uint16_t id);
+
 private:
     using TextureVariant = std::variant<std::monostate, mce::TexturePtr, mce::ClientTexture, mce::ServerTexture>;
 

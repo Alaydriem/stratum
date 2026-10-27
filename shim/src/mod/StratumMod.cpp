@@ -2,6 +2,7 @@
 
 #include "bridge/ModLog.h"
 #include "bridge/RustBridge.h"
+#include "easyplace/UseHooks.h"
 #include "ghost/GhostRenderer.h"
 #include "hooks/ClientUpdateHook.h"
 #include "hooks/GameFocusLostHook.h"
@@ -47,6 +48,13 @@ bool StratumMod::enable() {
     ClientUpdateHook::hook();
     GameFocusLostHook::hook();
     GhostRenderer::start();
+    UseScreenGoneHook::hook();
+    UseHudTickHook::hook();
+    UseStackResponseHook::hook();
+    UseContainerOpenHook::hook();
+    UseContainerCloseHook::hook();
+    UseBuildBlockHook::hook();
+    UseBuildActionHook::hook();
     ModLog::info(
         "stratum enabled",
         "{\"config_dir\":" + ModLog::quote(RustBridge::utf8(mConfigDir))
@@ -57,7 +65,16 @@ bool StratumMod::enable() {
 
 bool StratumMod::disable() {
     if (!RustBridge::handle()) return true;
-    // unhook first so no game call can enter Rust, then end the picker, then unregister and stop Rust
+    // unhook first, in reverse install order, so no game call can enter Rust, then end the picker, then unregister and
+    // stop Rust
+    UseBuildActionHook::unhook();
+    UseBuildBlockHook::unhook();
+    UseContainerCloseHook::unhook();
+    UseContainerOpenHook::unhook();
+    UseStackResponseHook::unhook();
+    UseHudTickHook::unhook();
+    UseScreenGoneHook::unhook();
+    UseDriver::reset();
     GhostRenderer::stop();
     GameFocusLostHook::unhook();
     ClientUpdateHook::unhook();

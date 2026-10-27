@@ -71,6 +71,11 @@ void GhostRenderer::afterRenderLevel(LevelRenderer& renderer, ScreenContext& scr
     if (gInstance) gInstance->frameIn(renderer, screen, frame);
 }
 
+Block const* GhostRenderer::paletteBlock(uint16_t id) {
+    if (!gInstance || !gInstance->mRegion || !gInstance->mUsable) return nullptr;
+    return gInstance->mBlocks.block(id);
+}
+
 void GhostRenderer::frameIn(LevelRenderer& renderer, ScreenContext& screen, FrameRenderObject const& frame) {
     StHandle* handle = RustBridge::handle();
     if (!handle) return;

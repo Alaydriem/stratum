@@ -702,3 +702,25 @@ msgstr ""
 
 msgid "Quick"
 msgstr ""
+
+msgid "Easy place"
+msgstr ""
+
+msgid "Easy place off"
+msgstr ""
+
+#. the state of the easy place switch
+msgid "On"
+msgstr ""
+
+#. the state of the easy place switch
+msgid "Off"
+msgstr ""
+
+#. {block} is the readable name of the item the build needs
+#, python-brace-format
+msgid "No {block} in your inventory"
+msgstr ""
+
+msgid "Nothing to place this block against"
+msgstr ""

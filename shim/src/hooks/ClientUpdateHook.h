@@ -2,6 +2,7 @@
 
 #include "bridge/ModLog.h"
 #include "bridge/RustBridge.h"
+#include "easyplace/UseDriver.h"
 #include "picker/PickerPump.h"
 #include "state/FrameStatusReader.h"
 
@@ -12,8 +13,8 @@
 
 namespace stratum {
 
-// once per client tick, after the game's own update: hands a finished pick to Rust, runs the tick, then opens
-// the picker when Rust asked for it
+// once per client tick, after the game's own update: hands a finished pick to Rust, runs the tick, opens the
+// picker when Rust asked for it, then runs the easy place hold
 LL_TYPE_INSTANCE_HOOK(
     ClientUpdateHook,
     ll::memory::HookPriority::Normal,
@@ -43,6 +44,7 @@ LL_TYPE_INSTANCE_HOOK(
         lastTick = tick;
     }
     if (st_take_picker_request(handle)) PickerPump::request();
+    UseDriver::tick(*this);
     return result;
 }
 

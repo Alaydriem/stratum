@@ -3,6 +3,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use stratum_core::services::StratumController;
+use stratum_core::structs::easy_place::{InventorySlot, SpotWorld, UseCommand, UseProbe};
 use stratum_core::structs::frame::FrameStatus;
 use stratum_core::structs::ghost::GhostFrame;
 use stratum_core::structs::hud::HudState;
@@ -18,6 +19,8 @@ pub struct HandleState {
     ghost: Arc<SharedGhost>,
     meter: TickMeter,
     ghost_meter: GhostMeter,
+    // True while the HUD keys are live, which is also when the use path may act.
+    use_open: bool,
 }
 
 impl HandleState {
@@ -30,7 +33,15 @@ impl HandleState {
         ghost: Arc<SharedGhost>,
     ) -> Self {
         shared.publish(controller.snapshot());
-        Self { controller, session, shared, ghost, meter: TickMeter::new(), ghost_meter: GhostMeter::new() }
+        Self {
+            controller,
+            session,
+            shared,
+            ghost,
+            meter: TickMeter::new(),
+            ghost_meter: GhostMeter::new(),
+            use_open: false,
+        }
     }
 
     // The manager's events go first, so a close, a world exit or new settings shape this tick. Then the frame's
@@ -78,6 +89,49 @@ impl HandleState {
         }
         self.controller.set_hud_held(self.session.hud_keys_held());
         self.shared.publish_hud(self.session.hud_shown().then_some(self.controller.hud_state()));
+        self.sync_use_gate();
+    }
+
+    // The use path follows the Hud lease: the same rule as the HUD keys. When the gate closes, the hold in
+    // progress ends once.
+    fn sync_use_gate(&mut self) {
+        let open = self.session.hud_shown();
+        if self.use_open && !open {
+            self.controller.use_released();
+        }
+        self.use_open = open;
+    }
+
+    // The ghost spot under the crosshair; None while the gate is closed.
+    pub fn use_aim(&mut self, probe: &UseProbe) -> Option<[i32; 3]> {
+        if !self.use_open {
+            return None;
+        }
+        self.controller.use_aim(probe)
+    }
+
+    // What to do with this use; vanilla while the gate is closed.
+    pub fn use_decide(
+        &mut self,
+        probe: &UseProbe,
+        world: Option<&SpotWorld>,
+        inventory: &[InventorySlot<'_>],
+        selected: u8,
+    ) -> UseCommand {
+        if !self.use_open {
+            return UseCommand::Vanilla;
+        }
+        self.controller.use_decide(probe, world, inventory, selected)
+    }
+
+    // A block of the world changed at `cell`; `block` is its name.
+    pub fn block_seen(&mut self, cell: [i32; 3], block: &[u8], time_seconds: f64) {
+        self.controller.block_seen(cell, block, time_seconds);
+    }
+
+    // The use key went up.
+    pub fn use_released(&mut self) {
+        self.controller.use_released();
     }
 
     // True while the Hud lease is held: the HUD keys are live and the card shows.
@@ -127,6 +181,7 @@ impl HandleState {
         let window = self.ghost_meter.take();
         let ghost_tick = self.controller.take_ghost_tick();
         let render = self.ghost.render_meter().take();
+        let easy_place = self.controller.easy_place_telemetry();
         curia::info!("telemetry", {
             ticks: self.meter.ticks(),
             tick_avg_us: self.meter.average_us(),
@@ -180,6 +235,13 @@ impl HandleState {
             ghost_reports_dropped: self.ghost.dropped_reports(),
             ghost_report_entries_dropped: self.ghost.dropped_entries(),
             ghost_reports_merged: self.ghost.merged_reports(),
+            easy_place_placed: easy_place.placed,
+            easy_place_confirmed: easy_place.confirmed,
+            easy_place_rejected: easy_place.rejected,
+            easy_place_wrong: easy_place.wrong,
+            easy_place_cancelled_missing: easy_place.cancelled_missing,
+            easy_place_cancelled_no_neighbour: easy_place.cancelled_no_neighbour,
+            easy_place_blocked_vanilla: easy_place.blocked_vanilla,
         });
         self.meter.start(status.time_seconds, snapshot.revision, status.feet);
     }
@@ -210,6 +272,7 @@ impl HandleState {
     // poisoned the lock.
     pub fn release_ui(&mut self) {
         self.session.release_ui();
+        self.sync_use_gate();
         self.shared.publish_hud(None);
         let mut cleared = GhostFrame::new();
         cleared.clear_all = true;

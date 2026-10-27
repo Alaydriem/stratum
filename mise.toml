@@ -2,7 +2,6 @@
 description = "Names a missing Rust toolchain, cargo-nextest or sibling crates and modmanager checkout before a build turns it into an obscure error"
 dir = "{{config_root}}"
 run = [
-  '''pwsh -NoProfile -Command "if (-not (Test-Path '../crates/crates/levi-ui/Cargo.toml')) { Write-Error 'crates not found at ../crates (path dependencies need it next to stratum)'; exit 1 }"''',
   '''pwsh -NoProfile -Command "if (-not (Test-Path '../modmanager/crates/amm-client/Cargo.toml')) { Write-Error 'modmanager not found at ../modmanager (path dependencies need it next to stratum)'; exit 1 }"''',
   "rustc --version",
   "cargo --version",
@@ -54,7 +53,7 @@ depends = ["build-ffi", "header"]
 dir = "{{config_root}}/shim"
 # -r: levibuildscript 0.6.2 deletes its prelink library after each link but skips the prelink when only
 # stratum_ffi.lib changed, so an incremental relink fails with LNK1181 bedrock_runtime_api.lib
-run = ["xmake f -p windows -a x64 -m release -y", "xmake -r -y"]
+run = ["xmake f -p windows -a x64 -m release -y", "xmake -r -y -j 8"]
 
 [tasks.install-mod]
 description = "Copies the built mod into the game mods folder named by LM_MODS_DIR (set it in mise.local.toml)"

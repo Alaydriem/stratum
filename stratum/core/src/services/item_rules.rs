@@ -18,6 +18,9 @@ const DEFAULT_STACK_SIZE: u32 = 64;
 pub struct ItemRules;
 
 impl ItemRules {
+    // The namespace of vanilla block and item names.
+    pub const NAMESPACE: &str = NAMESPACE;
+
     // Blocks that no player can hold, sorted by name.
     pub const NOT_HOLDABLE: &[&str] = &[
         "air",

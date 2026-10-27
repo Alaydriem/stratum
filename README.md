@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="./assets/readme.png" alt="Stratum" width="256">
+
 # Alaydriem's Stratum
 
 [![Release](https://img.shields.io/github/v/release/alaydriem/levi-stratum?include_prereleases)](https://github.com/alaydriem/levi-stratum/releases)
@@ -10,15 +12,15 @@
 
 </div>
 
-A structure helper for Minecraft Bedrock. Import `.mcstructure` files, place a marker in the world, and build over the ghost blocks layer by layer, with a material list for the full build, fully client side in Levi Lamina, written in Rust for high performance using Bedrock's native rendering engine.
+A structure helper for Minecraft Bedrock. Import `.mcstructure` files, place a marker in the world, and build over the ghost blocks layer by layer, with a material list for the full build, fully client side in LeviLamina, written in Rust for high performance using Bedrock's native rendering engine.
 
-Stratum is everything Structura and Holoprint should be if they weren't restricted by Minecraft Bedrock's scripting engine -- a fully litematica replacement for Minecraft Bedrock edition
+Stratum is everything Structura and Holoprint should be if they weren't restricted by Minecraft Bedrock's scripting engine -- a full Litematica replacement for Minecraft Bedrock Edition
 
 ## Features
 
 - Projects with structure libraries
-- Import a .mcstructure while in the game from Window's native file picker. No more converting strucutres to structura or holoprint.
-- Persistent markers that are locked to their position and settings in each world. Create markers for all of your projects, load them when you need them, and pick off _exactly_ where you left them. No more re-adjusting holoprints or structura packs to get them locked to the right position.
+- Import a .mcstructure while in the game from the Windows native file picker. No more converting structures to Structura or Holoprint.
+- Persistent markers that are locked to their position and settings in each world. Create markers for all of your projects, load them when you need them, and pick up _exactly_ where you left them. No more re-adjusting Holoprint or Structura packs to get them locked to the right position.
 - Rotate, move, and adjust the opacity and layer for each structure independently, with ghost blocks for the active marker
 - Easy Place - grab your items in your inventory then right click to auto-place and correctly orient blocks from your inventory
 - Material lists with text export, item counts, and stacks with sorting and filtering
@@ -127,4 +129,4 @@ mise run test
 
 ## License
 
-BSD 3-Clause. See [LICENSE](./LICENSE). [Nordwand Mono](https://github.com/tywr/Nordwand-Mono) is under the SIL Open Font License 1.1.
+BSD 3-Clause. Copyright (c) 2026 Charles R. Portwood II. See [LICENSE](./LICENSE). [Nordwand Mono](https://github.com/tywr/Nordwand-Mono) is under the SIL Open Font License 1.1.

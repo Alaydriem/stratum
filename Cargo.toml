@@ -6,6 +6,8 @@ members = ["stratum/core", "stratum/ui", "stratum/ffi", "stratum/tools"]
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.98"
+authors = ["Charles R. Portwood II"]
+license = "BSD-3-Clause"
 publish = false
 
 [workspace.dependencies]
@@ -19,13 +21,13 @@ criterion = "=0.8.2"
 thiserror = "2.0.17"
 curia = "=0.2.2"
 hcl-rs = "=0.19.8"
-levi-ui = { path = "../crates/crates/levi-ui" }
-levi-i18n = { path = "../crates/crates/levi-i18n" }
-levi-i18n-tool = { path = "../crates/crates/levi-i18n-tool" }
-levi-rules = { path = "../crates/crates/levi-rules" }
-amm-abi = { path = "../modmanager/crates/amm-abi" }
-amm-core = { path = "../modmanager/crates/amm-core" }
-amm-client = { path = "../modmanager/crates/amm-client" }
+levi-ui = { git = "https://github.com/Alaydriem/levi-crates", tag = "v1.0.0" }
+levi-i18n = { git = "https://github.com/Alaydriem/levi-crates", tag = "v1.0.0" }
+levi-i18n-tool = { git = "https://github.com/Alaydriem/levi-crates", tag = "v1.0.0" }
+levi-rules = { git = "https://github.com/Alaydriem/levi-crates", tag = "v1.0.0" }
+amm-abi = { git = "https://github.com/Alaydriem/levi-modmanager", tag = "v1.0.0" }
+amm-core = { git = "https://github.com/Alaydriem/levi-modmanager", tag = "v1.0.0" }
+amm-client = { git = "https://github.com/Alaydriem/levi-modmanager", tag = "v1.0.0" }
 stratum-core = { path = "stratum/core" }
 stratum-ui = { path = "stratum/ui" }
 stratum-ffi = { path = "stratum/ffi" }

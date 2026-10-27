@@ -66,6 +66,9 @@ impl HudPass {
             origin: [0, 64, 0],
             rotation: Rotation::R0,
             has_structures: false,
+            easy_place: false,
+            notice: None,
+            notice_item: None,
         });
         snapshot
     }

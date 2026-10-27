@@ -14,4 +14,5 @@ pub enum HudAction {
     Rotate(i8),
     StructureNext,
     StructurePrev,
+    ToggleEasyPlace,
 }

@@ -1,6 +1,6 @@
 {
     "name": "alaydriem-stratum",
-    "author": "Alaydriem",
+    "author": "Charles R. Portwood II",
     "entry": "${modFile}",
     "version": "${modVersion}",
     "type": "native",

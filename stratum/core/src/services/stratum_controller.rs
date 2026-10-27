@@ -5,12 +5,16 @@ use std::time::{Duration, Instant};
 
 use super::materials_job::MaterialsJob;
 use super::{
-    GhostService, HudInput, ImportWorker, InboxScanner, ItemRules, LayoutSolver, LibraryService, LibraryStore,
-    MarkerService, MarkerStore, MaterialCounter, MaterialsWorker, StoreWriter, StructureCache,
+    EasyPlaceService, GhostService, HudInput, ImportWorker, InboxScanner, ItemRules, LayoutSolver, LibraryService,
+    LibraryStore, MarkerService, MarkerStore, MaterialCounter, MaterialsWorker, PlaceNeeds, StoreWriter,
+    StructureCache,
 };
 use crate::config::{GhostConfig, ImportConfig, StratumConfig};
 use crate::errors::{ImportBusy, LibraryError, MarkerError, StoreError, StructureError};
 use crate::structs::action::{HudAction, LibraryAction, MaterialScope};
+use crate::structs::easy_place::{
+    EasyPlaceNotice, EasyPlaceTelemetry, InventorySlot, PlaceNeed, SpotWorld, UseCommand, UseProbe,
+};
 use crate::structs::frame::FrameStatus;
 use crate::structs::ghost::{GhostFrame, GhostReport, GhostTelemetry, GhostTickMeter, GhostTickWindow};
 use crate::structs::hud::{HudKey, HudState, HudTarget};
@@ -18,7 +22,7 @@ use crate::structs::import::{ImportFailure, ImportRequest, ImportResult};
 use crate::structs::layout::{BigBuildLayout, LayoutIssue};
 use crate::structs::library::{Library, NewStructure, Project, ProjectId, ProjectKind, StructureEntry, StructureId};
 use crate::structs::marker::{Marker, MarkerSet, MarkerTarget, Rotation, WorldKey};
-use crate::structs::material::{MaterialList, StructureLoad, StructureLoaded};
+use crate::structs::material::{ItemId, MaterialList, StructureLoad, StructureLoaded};
 use crate::structs::snapshot::{
     HudRow, ImportNotice, ImportPick, LibrarySnapshot, MarkerRow, ProjectRow, StructureRow,
 };
@@ -108,6 +112,13 @@ pub struct StratumController {
     ghost_failed: HashSet<StructureId>,
     // Where the HUD keys stand; kept for the session, never saved.
     hud: HudState,
+    easy_place: EasyPlaceService,
+    // The placement needs of the ghost build with the given revision. Rebuilt by the tick when the
+    // build changes. Bound: one entry, sized by the palette of the build.
+    place_needs: Option<(u64, PlaceNeeds)>,
+    // The latest easy place notice, the time it was taken and, for a missing block, the item it needs.
+    // Bound: one entry.
+    easy_place_notice: Option<(f64, EasyPlaceNotice, Option<ItemId>)>,
 }
 
 impl StratumController {
@@ -198,6 +209,9 @@ impl StratumController {
             ghost_in_flight: HashSet::new(),
             ghost_failed: HashSet::new(),
             hud: HudState::new(),
+            easy_place: EasyPlaceService::new(config.easy_place.clone()),
+            place_needs: None,
+            easy_place_notice: None,
             structures_dir: data_dir.join("structures"),
             config,
         };
@@ -225,12 +239,16 @@ impl StratumController {
                 self.notify(ImportNotice::LibraryUnavailable);
             }
         }
+        if self.status.menu_open {
+            self.easy_place.end_hold();
+        }
         self.sync_world();
         self.check_movement(moved);
         self.poll_inbox();
         self.drain_results();
         self.drain_loaded();
         self.expire_notices();
+        self.expire_easy_place_notice();
         self.save_if_due();
         self.release_saved_sources();
         self.update_ghost();
@@ -331,6 +349,62 @@ impl StratumController {
             return false;
         };
         self.hud_target(active, &self.snapshot.layouts).structures >= 2
+    }
+
+    // Step one of a use call: the ghost spot under the crosshair, if easy place is on for the active
+    // marker and the ghost is drawn and settled. The shim reads the world around the spot and calls
+    // `use_decide` next.
+    pub fn use_aim(&mut self, probe: &UseProbe) -> Option<[i32; 3]> {
+        let enabled =
+            self.markers.as_ref().and_then(MarkerService::active).is_some_and(|marker| marker.view.easy_place);
+        let build = if enabled {
+            match (self.ghost.aim_view(), &self.place_needs) {
+                (Some((build, view)), Some((revision, needs))) if *revision == build.revision => {
+                    Some((build, view, needs))
+                }
+                _ => None,
+            }
+        } else {
+            None
+        };
+        self.easy_place.aim(probe, build)
+    }
+
+    // Step two of a use call: what the shim does with this use.
+    pub fn use_decide(
+        &mut self,
+        probe: &UseProbe,
+        world: Option<&SpotWorld>,
+        inventory: &[InventorySlot<'_>],
+        selected: u8,
+    ) -> UseCommand {
+        let command = self.easy_place.decide(probe, world, inventory, selected);
+        if let Some(notice) = self.easy_place.take_notice() {
+            let item = match (&notice, &self.place_needs) {
+                (EasyPlaceNotice::Missing { palette_id }, Some((_, needs))) => match needs.need(*palette_id) {
+                    PlaceNeed::Place { item, .. } => Some(item.clone()),
+                    PlaceNeed::NotTarget => None,
+                },
+                _ => None,
+            };
+            self.easy_place_notice = Some((self.status.time_seconds, notice, item));
+            self.changed = true;
+        }
+        command
+    }
+
+    // A block of the world changed at `cell`; `block` is its name.
+    pub fn block_seen(&mut self, cell: [i32; 3], block: &[u8], time_seconds: f64) {
+        self.easy_place.seen(cell, block, time_seconds);
+    }
+
+    // The use key went up, or a gate closed.
+    pub fn use_released(&mut self) {
+        self.easy_place.end_hold();
+    }
+
+    pub fn easy_place_telemetry(&self) -> EasyPlaceTelemetry {
+        self.easy_place.telemetry()
     }
 
     // The ghost frame of the last tick. It stays valid until the next tick.
@@ -838,6 +912,9 @@ impl StratumController {
             opacity_step: marker.view.opacity().index(),
             origin: marker.origin,
             rotation: marker.rotation,
+            easy_place: marker.view.easy_place,
+            notice: self.easy_place_notice.as_ref().map(|(_, notice, _)| *notice),
+            notice_item: self.easy_place_notice.as_ref().and_then(|(_, _, item)| item.clone()),
         })
     }
 
@@ -1031,6 +1108,7 @@ impl StratumController {
         );
         self.ghost_tick.observe(u64::try_from(started.elapsed().as_micros()).unwrap_or(u64::MAX));
         self.cache.set_charged(self.ghost.turned_bytes());
+        self.refresh_place_needs();
         if self.ghost.take_cut_notice() {
             self.notify(ImportNotice::GhostCut);
         }
@@ -1038,6 +1116,18 @@ impl StratumController {
             self.notify(ImportNotice::GhostRefused);
         }
         self.route_ghost_loads();
+    }
+
+    // Builds the placement needs again when the drawn build is a different one. Runs on the tick, never
+    // on the use path.
+    fn refresh_place_needs(&mut self) {
+        let Some((build, _)) = self.ghost.aim_view() else {
+            return;
+        };
+        if self.place_needs.as_ref().is_some_and(|(revision, _)| *revision == build.revision) {
+            return;
+        }
+        self.place_needs = Some((build.revision, PlaceNeeds::new(&build.palette, &self.rules)));
     }
 
     // Drops what the build no longer needs, takes cached structures, and queues reads for the rest.
@@ -1091,6 +1181,14 @@ impl StratumController {
         let now = self.status.time_seconds;
         while self.notices.front().is_some_and(|(raised, _)| now - raised >= Self::NOTICE_SECONDS) {
             self.notices.pop_front();
+            self.changed = true;
+        }
+    }
+
+    fn expire_easy_place_notice(&mut self) {
+        let now = self.status.time_seconds;
+        if self.easy_place_notice.as_ref().is_some_and(|(taken, ..)| now - taken >= EasyPlaceService::NOTICE_SECONDS) {
+            self.easy_place_notice = None;
             self.changed = true;
         }
     }

@@ -217,6 +217,15 @@ impl GhostService {
         &self.needed
     }
 
+    // The build and the view the ghost draws now. None while the ghost is hidden, while the build
+    // is not ready and while a move has not settled, because the build then sits where the marker was.
+    pub fn aim_view(&self) -> Option<(&GhostBuild, GhostView)> {
+        if !self.shown || self.awaiting || self.shift != [0; 3] {
+            return None;
+        }
+        Some((self.build.as_ref()?, self.view?))
+    }
+
     // True while a new build is still being scanned for its sections.
     pub fn scanning(&self) -> bool {
         self.scan.is_some()

@@ -1,3 +1,4 @@
+mod easy_place;
 mod ghost;
 mod lifecycle;
 mod pause;

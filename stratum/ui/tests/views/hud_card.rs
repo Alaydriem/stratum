@@ -2,8 +2,11 @@ use egui::epaint::ClippedShape;
 use egui::{Context, Pos2, RawInput, Rect, vec2};
 use levi_ui::font::FontSource;
 use levi_ui::theme::Theme;
+use stratum_core::services::HudInput;
+use stratum_core::structs::easy_place::EasyPlaceNotice;
 use stratum_core::structs::hud::{HudControl, HudMode, HudState};
 use stratum_core::structs::marker::Rotation;
+use stratum_core::structs::material::ItemId;
 use stratum_core::structs::snapshot::HudRow;
 use stratum_ui::views::HudCard;
 
@@ -29,6 +32,9 @@ impl CardPass {
             origin: [-12, 64, 38],
             rotation: Rotation::R90,
             has_structures: true,
+            easy_place: false,
+            notice: None,
+            notice_item: None,
         }
     }
 
@@ -148,12 +154,63 @@ fn full_mode_shows_the_carousel_at_the_current_control() {
 }
 
 #[test]
-fn no_easy_place_chip() {
-    for state in [CardPass::quick(), CardPass::full(HudControl::Layer)] {
-        let (shapes, _) = CardPass::draw(&CardPass::row(), &state);
-        assert!(ShapeProbe::text_rect(&shapes, "Easy").is_none());
-        assert!(ShapeProbe::text_rect(&shapes, "easy").is_none());
+fn the_easy_place_chip_shows_on_and_off() {
+    let on = HudRow { easy_place: true, ..CardPass::row() };
+    let (shapes, _) = CardPass::draw(&on, &CardPass::quick());
+    assert!(CardPass::has(&shapes, "Easy place"));
+    assert!(!CardPass::has(&shapes, "Easy place off"));
+
+    let (shapes, _) = CardPass::draw(&CardPass::row(), &CardPass::quick());
+    assert!(CardPass::has(&shapes, "Easy place off"));
+    assert!(!CardPass::has(&shapes, "Easy place"));
+    let (shapes, _) = CardPass::draw(&CardPass::row(), &CardPass::full(HudControl::Layer));
+    assert!(CardPass::has(&shapes, "Easy place off"), "the chip shows in full mode too");
+}
+
+#[test]
+fn the_carousel_shows_easy_place_after_rotate() {
+    let controls = HudInput::carousel(HudControl::Rotate, true);
+    let rotate = controls.iter().position(|control| *control == HudControl::Rotate).unwrap();
+    assert_eq!(controls.get(rotate + 1), Some(&HudControl::EasyPlace));
+
+    let (shapes, _) = CardPass::draw(&CardPass::row(), &CardPass::full(HudControl::EasyPlace));
+    assert!(CardPass::has(&shapes, "Easy place"), "the control name");
+    assert!(CardPass::has(&shapes, "Off"));
+    assert!(CardPass::has(&shapes, "\u{E710}"), "the mark is the add glyph");
+    let on = HudRow { easy_place: true, ..CardPass::row() };
+    let (shapes, _) = CardPass::draw(&on, &CardPass::full(HudControl::EasyPlace));
+    assert!(CardPass::has(&shapes, "On"));
+}
+
+#[test]
+fn a_missing_block_notice_names_the_block() {
+    let row = HudRow {
+        easy_place: true,
+        notice: Some(EasyPlaceNotice::Missing { palette_id: 3 }),
+        notice_item: Some(ItemId("minecraft:oak_planks".to_owned())),
+        ..CardPass::row()
+    };
+    for state in [CardPass::quick(), CardPass::full(HudControl::EasyPlace)] {
+        let (shapes, _) = CardPass::draw(&row, &state);
+        assert!(CardPass::has(&shapes, "No Oak Planks in your inventory"));
+        assert!(CardPass::has(&shapes, "\u{E7BA}"), "the warning glyph");
     }
+
+    let row = HudRow { notice: Some(EasyPlaceNotice::NoNeighbour), notice_item: None, ..row };
+    let (shapes, _) = CardPass::draw(&row, &CardPass::quick());
+    assert!(CardPass::has(&shapes, "Nothing to place this block against"));
+}
+
+#[test]
+fn the_notice_line_is_empty_without_a_notice() {
+    let (shapes, plain) = CardPass::draw(&CardPass::row(), &CardPass::quick());
+    assert!(!CardPass::has(&shapes, "\u{E7BA}"));
+    assert!(!CardPass::has(&shapes, "Nothing to place this block against"));
+
+    let noticed = HudRow { notice: Some(EasyPlaceNotice::NoNeighbour), ..CardPass::row() };
+    let (_, with_notice) = CardPass::draw(&noticed, &CardPass::quick());
+    assert!(with_notice.height() > plain.height(), "the line takes room only while there is a notice");
+    assert_eq!(with_notice.bottom(), plain.bottom());
 }
 
 #[test]
